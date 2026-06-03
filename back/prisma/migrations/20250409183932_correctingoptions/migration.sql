@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "AllWithdrawal" ALTER COLUMN "itemSize" DROP NOT NULL,
+ALTER COLUMN "itemEan" DROP NOT NULL;

@@ -1,0 +1,95 @@
+.navbar2 {
+    justify-content: space-between;
+    align-items: center;
+    background-color: rgb(43, 48, 53);
+    color: #fff;
+    padding: 10px 20px;
+    width: 100vw;
+}
+
+.navbar-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: flex-start; /* Alinhar à esquerda */
+    width: 100vw;
+}
+
+.navbar-list li {
+    margin: 0;
+}
+
+.navbar-list li a {
+    display: block;
+    padding: 15px;
+    text-decoration: none;
+    color: #fff;
+    transition: background-color 0.3s;
+}
+
+.navbar-list li a:hover {
+    background-color: #555;
+}
+
+.navbar-mobile-button {
+    display: none;
+    cursor: pointer;
+    padding: 10px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    outline: none;
+}
+
+.navbar-mobile-button span {
+    display: block;
+    height: 2px;
+    width: 40px;
+    background-color: #fff;
+    margin: 6px 0;
+    transition: 0.4s;
+}
+
+.navbar-mobile-button.open span:nth-child(1) {
+    transform: rotate(-45deg) translate(-5px, 6px);
+}
+
+.navbar-mobile-button.open span:nth-child(2) {
+    opacity: 0;
+}
+
+.navbar-mobile-button.open span:nth-child(3) {
+    transform: rotate(45deg) translate(-5px, -6px);
+}
+
+.user-actions {
+    display: flex;
+    align-items: center;
+}
+
+.user-actions span {
+    margin-right: 10px; /* Espaçamento entre o texto e o botão */
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .navbar-list {
+        flex-direction: column;
+        display: none;
+        width: 100%;
+        position: absolute;
+        top: 60px;
+        left: 0;
+        z-index: 1;
+        background-color: rgb(43, 48, 53);
+    }
+
+    .navbar-list.open {
+        display: flex;
+    }
+
+    .navbar-mobile-button {
+        display: block;
+    }
+}

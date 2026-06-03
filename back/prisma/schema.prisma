@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
+  login    String @unique
+  password String
+  role     String
+}
+
+model Employee {
+  id            Int          @id @default(autoincrement())
+  name          String
+  company       String
+  role          String
+  department    String
+  admissionDate DateTime
+  shirt_size    String?
+  pants_size    Int?
+  shoes_size    Int?
+  withdrawals   Withdrawal[]
+}
+
+model Item {
+  id          Int          @id @default(autoincrement())
+  name        String
+  quantity    Int
+  ean         String?
+  type        String
+  sector      String
+  size        String?
+  withdrawals Withdrawal[]
+}
+
+model Withdrawal {
+  id             Int      @id @default(autoincrement())
+  withdrawalDate DateTime @default(now()) // Data de retirada
+  item           Item     @relation(fields: [itemId], references: [id])
+  quantity       Int
+  itemId         Int
+  employee       Employee @relation(fields: [employeeId], references: [id])
+  employeeId     Int
+}
+
+model Cabinet {
+  number    Int       @id
+  size      String
+  sector    String
+  situation String
+  date      DateTime?
+  name      String?
+}
+
+model AllWithdrawal {
+  id                 Int      @id @default(autoincrement())
+  idWithdrawal       Int
+  withdrawalDate     DateTime
+  itemId             Int
+  itemName           String
+  itemType           String
+  itemSector         String
+  itemSize           String?
+  itemEan            String?
+  quantity           Int
+  employeeName       String
+  employeeId         Int
+  employeeRole       String
+  employeeCompany    String
+  employeeDepartment String
+}
