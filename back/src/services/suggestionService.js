@@ -4,6 +4,7 @@ import {
   MESES_COBERTURA_PADRAO,
   MESES_COBERTURA_ESCRITORIO,
   MESES_COBERTURA_LIMPEZA,
+  FATOR_ATENCAO,
 } from "../config/businessRules.js";
 
 // Calcula a cobertura em meses de acordo com o setor
@@ -79,12 +80,15 @@ export async function gerarSugestoes() {
     // Sugestão = quanto falta para atingir o estoque alvo
     const sugestaoQuantidade = Math.max(0, estoqueAlvo - item.quantity);
 
-    // Status do estoque
+    const limiteAtencao = margemSeguranca > 0 ? Math.ceil(margemSeguranca * FATOR_ATENCAO) : 0;
+
     let status = "OK";
     if (item.quantity === 0) {
       status = "SEM_ESTOQUE";
     } else if (margemSeguranca > 0 && item.quantity <= margemSeguranca) {
       status = "ABAIXO_MARGEM";
+    } else if (limiteAtencao > 0 && item.quantity <= limiteAtencao) {
+      status = "ATENCAO";
     } else if (item.quantity < estoqueIdeal) {
       status = "ESTOQUE_BAIXO";
     }
@@ -110,7 +114,7 @@ export async function gerarSugestoes() {
   });
 
   //Ordena: itens que precisam de reposição primeiro, depois por urgência
-  const ordemStatus = { SEM_ESTOQUE: 0, ABAIXO_MARGEM: 1, ESTOQUE_BAIXO: 2, OK: 3 };
+  const ordemStatus = { SEM_ESTOQUE: 0, ABAIXO_MARGEM: 1, ATENCAO: 2, ESTOQUE_BAIXO: 3, OK: 4 };
   sugestoes.sort((a, b) => {
     const ordemA = ordemStatus[a.status] ?? 99;
     const ordemB = ordemStatus[b.status] ?? 99;
@@ -121,18 +125,20 @@ export async function gerarSugestoes() {
   //Resumo geral
   const precisamReposicao = sugestoes.filter((s) => s.sugestaoQuantidade > 0);
 
-  return {
-    parametros: {
-      janelaAnaliseDias: JANELA_ANALISE_DIAS,
-      mesesCoberturaPadrao: MESES_COBERTURA_PADRAO,
-    },
-    resumo: {
-      totalItens: sugestoes.length,
-      itensPrecisamReposicao: precisamReposicao.length,
-      itensSemEstoque: sugestoes.filter((s) => s.status === "SEM_ESTOQUE").length,
-      itensAbaixoMargem: sugestoes.filter((s) => s.status === "ABAIXO_MARGEM").length,
-      itensEstoqueBaixo: sugestoes.filter((s) => s.status === "ESTOQUE_BAIXO").length,
-    },
+    return {
+      parametros: {
+        janelaAnaliseDias: JANELA_ANALISE_DIAS,
+        mesesCoberturaPadrao: MESES_COBERTURA_PADRAO,
+        fatorAtencao: FATOR_ATENCAO,
+      },
+      resumo: {
+        totalItens: sugestoes.length,
+        itensPrecisamReposicao: precisamReposicao.length,
+        itensSemEstoque: sugestoes.filter((s) => s.status === "SEM_ESTOQUE").length,
+        itensAbaixoMargem: sugestoes.filter((s) => s.status === "ABAIXO_MARGEM").length,
+        itensAtencao: sugestoes.filter((s) => s.status === "ATENCAO").length,
+        itensEstoqueBaixo: sugestoes.filter((s) => s.status === "ESTOQUE_BAIXO").length,
+      },
     sugestoes,
   };
 }

@@ -8,3 +8,4 @@ export const JANELA_ANALISE_DIAS = 90;          // Período de análise do consu
 export const MESES_COBERTURA_PADRAO = 3;        // Para quantos meses o estoque deve cobrir
 export const MESES_COBERTURA_ESCRITORIO = 1;    // Cobertura para itens de ESCRITORIO
 export const MESES_COBERTURA_LIMPEZA = 1;       // Cobertura para itens de LIMPEZA
+export const FATOR_ATENCAO = 1.5;              // Multiplicador da margem para nível ATENÇÃO (ex: margem 30 × 1.5 = aviso em 45)
