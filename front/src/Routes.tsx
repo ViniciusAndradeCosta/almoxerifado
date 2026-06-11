@@ -14,6 +14,12 @@ import { AuthProvider, useAuth } from "./Auth/AuthContext";
 import Register from "./pages/Login/Register";
 import AtualizaSaida from "./pages/Item/AtualizaSaida";
 import DemandPage from "./pages/Dashboard/Demanda";
+import EntradaEstoque from "./pages/Item/EntradaEstoque";
+import Pedidos from "./pages/Item/Pedidos";
+import Relatorios from "./pages/Item/Relatorios";
+import Sugestoes from "./pages/Item/Sugestoes";
+import Descartados from "./pages/Item/Descartados";
+import Lavanderia from "./pages/Item/Lavanderia";
 
 const AdminRoutes = () => {
   const { authenticated, user } = useAuth();
@@ -53,6 +59,13 @@ const AppRoutes = () => {
             <Route path="/item/:id" element={<><Navbar /><AtualizaItem /></>} />
             <Route path="/atualizarsaida/:id" element={<><Navbar /><AtualizaSaida /></>} />
             <Route path="/demanda" element={<><Navbar /><DemandPage /></>} />
+            <Route path="/entradas" element={<><Navbar /><EntradaEstoque /></>} />
+            <Route path="/pedidos" element={<><Navbar /><Pedidos /></>} />
+            <Route path="/relatorios" element={<><Navbar /><Relatorios /></>} />
+            <Route path="/sugestoes" element={<><Navbar /><Sugestoes /></>} />
+            <Route path="/descartados" element={<><Navbar /><Descartados /></>} />
+            <Route path="/lavanderia" element={<><Navbar /><Lavanderia /></>} />
+            
           </Route>
         </Routes>
       </BrowserRouter>
