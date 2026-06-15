@@ -49,8 +49,9 @@ const AtualizaSaida = () => {
     fetchWithdrawal();
   }, [id]);
 
+  const LIMITE_DIAS_SAIDA = 20;
   const today = format(new Date(), 'yyyy-MM-dd');
-  const oneWeekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+  const dataLimiteSaida = format(subDays(new Date(), LIMITE_DIAS_SAIDA), 'yyyy-MM-dd');
 
   return (
     <div className="container">
@@ -62,7 +63,7 @@ const AtualizaSaida = () => {
             type="date" 
             className="form-control" 
             id="withdrawalDate" 
-            min={oneWeekAgo}
+            min={dataLimiteSaida}
             max={today}
             style={{ userSelect: 'none', caretColor: 'transparent' }}
             onKeyDown={(e) => e.preventDefault()}

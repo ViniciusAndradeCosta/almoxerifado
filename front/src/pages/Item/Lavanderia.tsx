@@ -30,11 +30,12 @@ const Lavanderia = () => {
     // Formulário envio
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
     const [itemSearch, setItemSearch] = useState("");
-    const [quantity, setQuantity] = useState<number>(1);
+    const [quantity, setQuantity] = useState<number>(0);
     const [sendDate, setSendDate] = useState(() => new Date().toISOString().split("T")[0]);
     const [expectedReturn, setExpectedReturn] = useState("");
     const [sentBy, setSentBy] = useState("");
     const [notes, setNotes] = useState("");
+    const [tipoEnvio, setTipoEnvio] = useState("ESTOQUE");
 
     // Modal retorno
     const [showReturnModal, setShowReturnModal] = useState(false);
@@ -124,15 +125,19 @@ const Lavanderia = () => {
                 expectedReturn: expectedReturn ? new Date(expectedReturn).toISOString() : null,
                 sentBy: sentBy || null,
                 notes: notes || null,
+                tipo: tipoEnvio,
             };
 
             const res = await api.post("/laundry/send", data);
 
             if (res.data.success) {
-                window.alert("Peças enviadas para a lavanderia!");
+                const msg = tipoEnvio === "ESTOQUE"
+                    ? "Peças do estoque enviadas para a lavanderia (estoque atualizado)!"
+                    : "Peças do funcionário registradas para lavanderia (estoque não afetado).";
+                window.alert(msg);
                 setSelectedItemId(null);
                 setItemSearch("");
-                setQuantity(1);
+                setQuantity(0);
                 setExpectedReturn("");
                 setSentBy("");
                 setNotes("");
@@ -182,6 +187,18 @@ const Lavanderia = () => {
             const msg = error.response?.data?.error || "Erro ao registrar retorno.";
             window.alert(msg);
         }
+    };
+
+    const getTipoLabel = (tipo: string | null) => {
+        if (tipo === "ESTOQUE") return "Estoque";
+        if (tipo === "FUNCIONARIO") return "Funcionário";
+        return tipo || "—";
+    };
+
+    const getTipoBadge = (tipo: string | null) => {
+        if (tipo === "ESTOQUE") return "bg-primary";
+        if (tipo === "FUNCIONARIO") return "bg-secondary";
+        return "bg-secondary";
     };
 
     if (loading) {
@@ -277,6 +294,7 @@ const Lavanderia = () => {
                                             <th>ID</th>
                                             <th>Item</th>
                                             <th>Tipo</th>
+                                            <th>Origem</th>
                                             <th>Qtd</th>
                                             <th>Enviado em</th>
                                             <th>Retorno Previsto</th>
@@ -291,6 +309,11 @@ const Lavanderia = () => {
                                                 <td>{r.id}</td>
                                                 <td>{r.item.name}</td>
                                                 <td>{r.item.type}</td>
+                                                <td>
+                                                    <span className={`badge ${getTipoBadge(r.laundryName)}`}>
+                                                        {getTipoLabel(r.laundryName)}
+                                                    </span>
+                                                </td>
                                                 <td>{r.quantity}</td>
                                                 <td>{formatDate(r.sendDate)}</td>
                                                 <td>
@@ -329,6 +352,33 @@ const Lavanderia = () => {
                 <div className="card">
                     <div className="card-body">
                         <h5 className="card-title">Enviar Peças para Lavanderia</h5>
+
+                        {/* Seletor de tipo */}
+                        <div className="row g-3 mb-3">
+                            <div className="col-md-6">
+                                <label className="form-label">Origem das peças</label>
+                                <select
+                                    className="form-select"
+                                    value={tipoEnvio}
+                                    onChange={(e) => setTipoEnvio(e.target.value)}
+                                >
+                                    <option value="ESTOQUE">Estoque — sai do estoque temporariamente</option>
+                                    <option value="FUNCIONARIO">Funcionário — não afeta o estoque</option>
+                                </select>
+                            </div>
+                            <div className="col-md-6 d-flex align-items-end">
+                                {tipoEnvio === "ESTOQUE" ? (
+                                    <div className="alert alert-info mb-0 w-100 py-2">
+                                        As peças serão <strong>retiradas do estoque</strong> e devolvidas no retorno.
+                                    </div>
+                                ) : (
+                                    <div className="alert alert-secondary mb-0 w-100 py-2">
+                                        Registro apenas para controle. <strong>Estoque não será alterado.</strong>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <form onSubmit={handleSend}>
                             <div className="row g-3">
                                 <div className="col-md-5 position-relative">
@@ -361,8 +411,8 @@ const Lavanderia = () => {
                                     <input
                                         type="number"
                                         className="form-control"
-                                        value={quantity}
-                                        onChange={(e) => setQuantity(Number(e.target.value))}
+                                        value={quantity || ""}
+                                        onChange={(e) => setQuantity(e.target.value === "" ? 0 : Number(e.target.value))}
                                         min={1}
                                     />
                                 </div>
@@ -429,6 +479,7 @@ const Lavanderia = () => {
                                         <tr>
                                             <th>ID</th>
                                             <th>Item</th>
+                                            <th>Origem</th>
                                             <th>Qtd</th>
                                             <th>Status</th>
                                             <th>Enviado em</th>
@@ -442,6 +493,11 @@ const Lavanderia = () => {
                                             <tr key={r.id}>
                                                 <td>{r.id}</td>
                                                 <td>{r.item.name}</td>
+                                                <td>
+                                                    <span className={`badge ${getTipoBadge(r.laundryName)}`}>
+                                                        {getTipoLabel(r.laundryName)}
+                                                    </span>
+                                                </td>
                                                 <td>{r.quantity}</td>
                                                 <td>
                                                     <span className={`badge ${r.status === "RETORNADA" ? "bg-success" : "bg-primary"}`}>
@@ -482,20 +538,31 @@ const Lavanderia = () => {
                                     <strong>Enviadas:</strong> {returnRecord.quantity} peças em{" "}
                                     {formatDate(returnRecord.sendDate)}
                                 </p>
+                                <p>
+                                    <strong>Origem:</strong>{" "}
+                                    <span className={`badge ${getTipoBadge(returnRecord.laundryName)}`}>
+                                        {getTipoLabel(returnRecord.laundryName)}
+                                    </span>
+                                    {returnRecord.laundryName === "FUNCIONARIO" && (
+                                        <small className="text-muted ms-2">(estoque não será alterado)</small>
+                                    )}
+                                </p>
 
                                 <div className="mb-3">
                                     <label className="form-label">Quantidade que Retornou</label>
                                     <input
                                         type="number"
                                         className="form-control"
-                                        value={returnQty}
-                                        onChange={(e) => setReturnQty(Number(e.target.value))}
+                                        value={returnQty || ""}
+                                        onChange={(e) => setReturnQty(e.target.value === "" ? 0 : Number(e.target.value))}
                                         min={1}
                                         max={returnRecord.quantity}
                                     />
-                                    <small className="text-muted">
-                                        Se retornar menos que {returnRecord.quantity}, a diferença será registrada como descarte (dano).
-                                    </small>
+                                    {returnRecord.laundryName === "ESTOQUE" && (
+                                        <small className="text-muted">
+                                            Se retornar menos que {returnRecord.quantity}, a diferença será registrada como descarte (dano).
+                                        </small>
+                                    )}
                                 </div>
                                 <div className="mb-3">
                                     <label className="form-label">Data do Retorno</label>

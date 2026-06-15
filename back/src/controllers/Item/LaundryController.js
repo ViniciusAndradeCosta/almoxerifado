@@ -3,10 +3,10 @@ import { enviarParaLavanderia, retornarDaLavanderia, pecasNaLavanderia, resumoLa
 
 // POST /laundry/send — envia peças para lavanderia
 export async function sendToLaundry(req, res) {
-  const { itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate } = req.body;
+  const { itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate, tipo } = req.body;
 
   try {
-    const result = await enviarParaLavanderia({ itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate });
+    const result = await enviarParaLavanderia({ itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate, tipo });
     return res.status(201).json({
       success: true,
       record: result.record,

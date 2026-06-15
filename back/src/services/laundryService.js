@@ -2,9 +2,14 @@ import prisma from "../database/client.js";
 
 // Envia peças para a lavanderia (TRANSACIONAL)
 // Decrementa o estoque temporariamente e cria o registro.
-export async function enviarParaLavanderia({ itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate }) {
+export async function enviarParaLavanderia({ itemId, quantity, expectedReturn, laundryName, sentBy, notes, sendDate, tipo }) {
   const itmId = Number(itemId);
   const qty = Number(quantity);
+  const tipoEnvio = (tipo || "ESTOQUE").toUpperCase(); // ESTOQUE ou FUNCIONARIO
+
+  if (!["ESTOQUE", "FUNCIONARIO"].includes(tipoEnvio)) {
+    throw { status: 400, message: "Tipo inválido. Use: ESTOQUE ou FUNCIONARIO." };
+  }
 
   if (!Number.isInteger(qty) || qty <= 0) {
     throw { status: 400, message: "Quantidade inválida." };
@@ -16,12 +21,14 @@ export async function enviarParaLavanderia({ itemId, quantity, expectedReturn, l
       throw { status: 400, message: "Item não encontrado." };
     }
 
-    // Trava: não pode enviar mais do que tem em estoque
-    if (item.quantity < qty) {
-      throw {
-        status: 400,
-        message: `Estoque insuficiente. Disponível: ${item.quantity}, tentando enviar: ${qty}.`,
-      };
+    // Só valida e decrementa estoque se for do tipo ESTOQUE
+    if (tipoEnvio === "ESTOQUE") {
+      if (item.quantity < qty) {
+        throw {
+          status: 400,
+          message: `Estoque insuficiente. Disponível: ${item.quantity}, tentando enviar: ${qty}.`,
+        };
+      }
     }
 
     const dataEnvio = sendDate ? new Date(sendDate) : new Date();
@@ -37,7 +44,6 @@ export async function enviarParaLavanderia({ itemId, quantity, expectedReturn, l
       }
     }
 
-    // Cria o registro de lavanderia
     const record = await tx.laundryRecord.create({
       data: {
         itemId: itmId,
@@ -45,19 +51,21 @@ export async function enviarParaLavanderia({ itemId, quantity, expectedReturn, l
         status: "ENVIADA",
         sendDate: dataEnvio,
         expectedReturn: dataRetornoPrevisto,
-        laundryName: laundryName || null,
+        laundryName: tipoEnvio, // Reutiliza o campo para guardar o tipo
         sentBy: sentBy || null,
         notes: notes || null,
       },
     });
 
-    // Decrementa o estoque (saída temporária)
-    const updatedItem = await tx.item.update({
-      where: { id: itmId },
-      data: { quantity: { decrement: qty } },
-    });
+    let updatedItem = item;
+    if (tipoEnvio === "ESTOQUE") {
+      updatedItem = await tx.item.update({
+        where: { id: itmId },
+        data: { quantity: { decrement: qty } },
+      });
+    }
 
-    return { record, item: updatedItem };
+    return { record, item: updatedItem, tipo: tipoEnvio };
   });
 }
 
@@ -79,7 +87,7 @@ export async function retornarDaLavanderia(recordId, { quantityReturned, returnD
       throw { status: 400, message: "Este lote já foi retornado." };
     }
 
-    // Quantidade retornada pode ser menor (peças perdidas/danificadas na lavanderia)
+    const tipoEnvio = record.laundryName; // ESTOQUE ou FUNCIONARIO
     const qtyReturn = quantityReturned !== undefined ? Number(quantityReturned) : record.quantity;
 
     if (!Number.isInteger(qtyReturn) || qtyReturn <= 0) {
@@ -95,7 +103,6 @@ export async function retornarDaLavanderia(recordId, { quantityReturned, returnD
 
     const dataRetorno = returnDate ? new Date(returnDate) : new Date();
 
-    // Atualiza o registro para RETORNADA
     const updatedRecord = await tx.laundryRecord.update({
       where: { id: recId },
       data: {
@@ -105,30 +112,32 @@ export async function retornarDaLavanderia(recordId, { quantityReturned, returnD
       },
     });
 
-    // Incrementa o estoque com a quantidade que voltou
-    const updatedItem = await tx.item.update({
-      where: { id: record.itemId },
-      data: { quantity: { increment: qtyReturn } },
-    });
-
-    // Se voltou menos do que enviou, registra a diferença como perda
-    const perdas = record.quantity - qtyReturn;
+    let updatedItem = await tx.item.findUnique({ where: { id: record.itemId } });
     let discardRecord = null;
+    const perdas = record.quantity - qtyReturn;
 
-    if (perdas > 0) {
-      discardRecord = await tx.discardedItem.create({
-        data: {
-          itemId: record.itemId,
-          quantity: perdas,
-          reason: "DANO",
-          notes: `Perda na lavanderia (registro #${recId}). Enviadas: ${record.quantity}, retornaram: ${qtyReturn}.`,
-          discardedBy: "Sistema (lavanderia)",
-          discardDate: dataRetorno,
-        },
+    // Só mexe no estoque se for do tipo ESTOQUE
+    if (tipoEnvio === "ESTOQUE") {
+      updatedItem = await tx.item.update({
+        where: { id: record.itemId },
+        data: { quantity: { increment: qtyReturn } },
       });
+
+      if (perdas > 0) {
+        discardRecord = await tx.discardedItem.create({
+          data: {
+            itemId: record.itemId,
+            quantity: perdas,
+            reason: "DANO",
+            notes: `Perda na lavanderia (registro #${recId}). Enviadas: ${record.quantity}, retornaram: ${qtyReturn}.`,
+            discardedBy: "Sistema (lavanderia)",
+            discardDate: dataRetorno,
+          },
+        });
+      }
     }
 
-    return { record: updatedRecord, item: updatedItem, perdas, discardRecord };
+    return { record: updatedRecord, item: updatedItem, perdas, discardRecord, tipo: tipoEnvio };
   });
 }
 

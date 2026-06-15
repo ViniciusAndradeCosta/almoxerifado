@@ -173,6 +173,31 @@ const Relatorios = () => {
             window.alert("Erro ao exportar CSV.");
         }
     };
+    const handleExportItemCSV = () => {
+        if (!reportData) return;
+
+        const linhas = [];
+        linhas.push("Tipo;Item;Data;Quantidade;Funcionário;Departamento");
+
+        reportData.detalheSaidas.forEach((s: any) => {
+            const data = new Date(s.withdrawalDate);
+            const dataFormatada = `${String(data.getDate()).padStart(2, "0")}/${String(data.getMonth() + 1).padStart(2, "0")}/${data.getFullYear()}`;
+            linhas.push(`Saída;${s.itemName};${dataFormatada};${s.quantity};${s.employeeName};${s.employeeDepartment}`);
+        });
+
+        reportData.detalheEntradas.forEach((e: any) => {
+            const data = new Date(e.entryDate);
+            const dataFormatada = `${String(data.getDate()).padStart(2, "0")}/${String(data.getMonth() + 1).padStart(2, "0")}/${data.getFullYear()}`;
+            linhas.push(`Entrada;${reportData.item.name};${dataFormatada};${e.quantity};${e.supplier || "—"};—`);
+        });
+
+        const csv = linhas.join("\n");
+        const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_${reportData.item.name.replace(/\s/g, "_")}.csv`;
+        link.click();
+    };
 
     return (
         <div className="container mt-3">
@@ -256,9 +281,18 @@ const Relatorios = () => {
                                         onChange={(e) => setDataFim(e.target.value)}
                                     />
                                 </div>
-                                <div className="col-md-2">
+                                <div className="col-md-1">
                                     <button className="btn btn-primary w-100" onClick={handleFetchReport}>
                                         Buscar
+                                    </button>
+                                </div>
+                                <div className="col-md-1">
+                                    <button
+                                        className="btn btn-outline-success w-100"
+                                        onClick={handleExportItemCSV}
+                                        disabled={!reportData}
+                                    >
+                                        CSV
                                     </button>
                                 </div>
                             </div>

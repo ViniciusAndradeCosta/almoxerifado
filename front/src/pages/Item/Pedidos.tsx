@@ -339,8 +339,9 @@ const Pedidos = () => {
                             <input
                                 type="number"
                                 className="form-control"
-                                value={novoItemQty}
-                                onChange={(e) => setNovoItemQty(Number(e.target.value))}
+                                value={novoItemQty || ""}
+                                onChange={(e) => setNovoItemQty(e.target.value === "" ? 0 : Number(e.target.value))}
+                                onFocus={(e) => { if (novoItemQty === 0) e.target.value = ""; }}
                                 min={1}
                             />
                         </div>

@@ -13,7 +13,7 @@ const EntradaEstoque = () => {
     // Formulário
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
     const [itemSearch, setItemSearch] = useState("");
-    const [quantity, setQuantity] = useState<number>(1);
+    const [quantity, setQuantity] = useState<number>(0);
     const [entryDate, setEntryDate] = useState(() => {
         const now = new Date();
         return now.toISOString().split("T")[0];
@@ -177,8 +177,8 @@ const EntradaEstoque = () => {
                                     type="number"
                                     className="form-control"
                                     id="quantity"
-                                    value={quantity}
-                                    onChange={(e) => setQuantity(Number(e.target.value))}
+                                    value={quantity || ""}
+                                    onChange={(e) => setQuantity(e.target.value === "" ? 0 : Number(e.target.value))}
                                     min={1}
                                 />
                             </div>

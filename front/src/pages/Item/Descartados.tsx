@@ -223,8 +223,9 @@ const Descartados = () => {
                                     type="number"
                                     className="form-control"
                                     id="quantity"
-                                    value={quantity}
-                                    onChange={(e) => setQuantity(Number(e.target.value))}
+                                    value={quantity || ""}
+                                    onChange={(e) => setQuantity(e.target.value === "" ? 0 : Number(e.target.value))}
+                                    onFocus={(e) => { if (quantity === 0) e.target.value = ""; }}
                                     min={1}
                                 />
                             </div>
