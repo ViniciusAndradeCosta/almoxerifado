@@ -3,7 +3,14 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../Auth/AuthContext";
 import { useTheme } from "../Auth/ThemeContext";
 import api from "../services/useApi";
+import {
+  IconHome, IconInbox, IconWash, IconPackage,
+  IconShoppingCart, IconBell, IconBarChart, IconTrendingUp,
+  IconUsers, IconArchive, IconSun, IconMoon, IconLogOut,
+  IconChevronDown, IconChevronLeft, IconChevronRight, IconMenu
+} from "./Icons";
 import "./Sidebar.css";
+import logoHiper from "../assets/logo-hiper.png";
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -26,133 +33,152 @@ const Sidebar = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fecha mobile ao navegar
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location]);
+  useEffect(() => { setMobileOpen(false); }, [location]);
 
-  const toggleMenu = (menu: string) => {
-    setOpenMenu(openMenu === menu ? null : menu);
-  };
+  const toggle = (menu: string) => setOpenMenu(openMenu === menu ? null : menu);
+  const active = (path: string) => location.pathname === path;
 
-  const isActive = (path: string) => location.pathname === path;
+  const initials = user?.name
+    ? user.name.split(" ").slice(0, 2).map(n => n[0]).join("").toUpperCase()
+    : "??";
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button className="sidebar-mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)}>
-        <span></span><span></span><span></span>
+      <button className="sb-mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)}>
+        <IconMenu size={20} />
       </button>
 
-      {/* Overlay */}
-      {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && <div className="sb-overlay" onClick={() => setMobileOpen(false)} />}
 
-      <aside className={`sidebar ${collapsed ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
-        {/* Header */}
-        <div className="sidebar-header">
-          {!collapsed && <h1 className="sidebar-logo">Almoxarifado</h1>}
-          <button className="sidebar-collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-            {collapsed ? "→" : "←"}
+      <aside className={`sb ${collapsed ? "sb--collapsed" : ""} ${mobileOpen ? "sb--open" : ""}`}>
+
+        {/* ── Header ── */}
+        <div className="sb-header">
+          <div className="sb-brand">
+            <img
+              src={logoHiper}
+              alt="Hiper Comercial"
+              className="sb-logo-img"
+            />
+            {!collapsed && (
+              <div className="sb-brand-text">
+                <span className="sb-brand-name">Hiper Comercial</span>
+                <span className="sb-brand-sub">Almoxarifado</span>
+              </div>
+            )}
+          </div>
+          <button className="sb-collapse" onClick={() => setCollapsed(!collapsed)}>
+            {collapsed ? <IconChevronRight size={13} /> : <IconChevronLeft size={13} />}
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="sidebar-nav">
-          {/* Estoque */}
-          <div className="sidebar-group">
-            <button className="sidebar-group-title" onClick={() => toggleMenu("estoque")}>
-              <span className="sidebar-icon">📦</span>
-              {!collapsed && <span>Estoque</span>}
-              {!collapsed && <span className={`sidebar-arrow ${openMenu === "estoque" ? "open" : ""}`}>▾</span>}
-            </button>
-            {openMenu === "estoque" && !collapsed && (
-              <ul className="sidebar-submenu">
-                <li><Link to="/estoque" className={isActive("/estoque") ? "active" : ""}>Ver Estoque</Link></li>
-                <li><Link to="/entradas" className={isActive("/entradas") ? "active" : ""}>Entradas</Link></li>
-                <li><Link to="/saidas" className={isActive("/saidas") ? "active" : ""}>Saídas</Link></li>
-                <li><Link to="/descartados" className={isActive("/descartados") ? "active" : ""}>Descartados</Link></li>
-                <li><Link to="/lavanderia" className={isActive("/lavanderia") ? "active" : ""}>Lavanderia</Link></li>
-              </ul>
-            )}
-          </div>
+        {/* ── Nav ── */}
+        <nav className="sb-nav">
 
-          {/* Pedidos */}
-          <Link to="/pedidos" className={`sidebar-link ${isActive("/pedidos") ? "active" : ""}`}>
-            <span className="sidebar-icon">🛒</span>
-            {!collapsed && <span>Pedidos</span>}
-          </Link>
+          {!collapsed && <span className="sb-section">Operação</span>}
 
-          {/* Inteligência */}
-          <div className="sidebar-group">
-            <button className="sidebar-group-title" onClick={() => toggleMenu("inteligencia")}>
-              <span className="sidebar-icon">📊</span>
-              {!collapsed && <span>Inteligência</span>}
-              {!collapsed && <span className={`sidebar-arrow ${openMenu === "inteligencia" ? "open" : ""}`}>▾</span>}
-            </button>
-            {openMenu === "inteligencia" && !collapsed && (
-              <ul className="sidebar-submenu">
-                <li><Link to="/relatorios" className={isActive("/relatorios") ? "active" : ""}>Relatórios</Link></li>
-                <li><Link to="/demanda" className={isActive("/demanda") ? "active" : ""}>Demanda</Link></li>
-              </ul>
-            )}
-          </div>
+          <NavLink to="/hoje" icon={<IconHome size={20}/>} label="Hoje" active={active("/hoje")} collapsed={collapsed}/>
+          <NavLink to="/entradas" icon={<IconInbox size={20}/>} label="Entrada de Estoque" active={active("/entradas")} collapsed={collapsed}/>
+          <NavLink to="/lavanderia" icon={<IconWash size={20}/>} label="Lavanderia" active={active("/lavanderia")} collapsed={collapsed}/>
 
-          {/* Alertas */}
-          <Link to="/sugestoes" className={`sidebar-link ${isActive("/sugestoes") ? "active" : ""}`}>
-            <span className="sidebar-icon">🔔</span>
-            {!collapsed && (
-              <>
-                <span>Alertas</span>
-                {alertCount > 0 && <span className="sidebar-badge">{alertCount}</span>}
-              </>
-            )}
-            {collapsed && alertCount > 0 && <span className="sidebar-badge-mini">{alertCount}</span>}
-          </Link>
+          {!collapsed && <span className="sb-section">Controle</span>}
 
-          {/* Funcionários */}
-          <div className="sidebar-group">
-            <button className="sidebar-group-title" onClick={() => toggleMenu("funcionarios")}>
-              <span className="sidebar-icon">👥</span>
-              {!collapsed && <span>Funcionários</span>}
-              {!collapsed && <span className={`sidebar-arrow ${openMenu === "funcionarios" ? "open" : ""}`}>▾</span>}
-            </button>
-            {openMenu === "funcionarios" && !collapsed && (
-              <ul className="sidebar-submenu">
-                <li><Link to="/funcionarios" className={isActive("/funcionarios") ? "active" : ""}>Ver Funcionários</Link></li>
-                <li><Link to="/cadastrarfuncionario" className={isActive("/cadastrarfuncionario") ? "active" : ""}>Cadastrar</Link></li>
-                <li><Link to="/funcionarios/new" className={isActive("/funcionarios/new") ? "active" : ""}>Novos</Link></li>
-              </ul>
-            )}
-          </div>
+          <NavGroup icon={<IconPackage size={20}/>} label="Estoque" id="estoque"
+            open={openMenu === "estoque"} collapsed={collapsed} onToggle={() => toggle("estoque")}>
+            <SubLink to="/estoque" label="Ver Estoque" active={active("/estoque")}/>
+            <SubLink to="/saidas" label="Saídas" active={active("/saidas")}/>
+            <SubLink to="/descartados" label="Descartados" active={active("/descartados")}/>
+          </NavGroup>
 
-          {/* Armário */}
-          <Link to="/armario" className={`sidebar-link ${isActive("/armario") ? "active" : ""}`}>
-            <span className="sidebar-icon">🗄️</span>
-            {!collapsed && <span>Armário</span>}
-          </Link>
+          <NavLink to="/pedidos" icon={<IconShoppingCart size={20}/>} label="Pedidos" active={active("/pedidos")} collapsed={collapsed}/>
+          <NavLink to="/sugestoes" icon={<IconBell size={20}/>} label="Alertas" active={active("/sugestoes")} collapsed={collapsed} badge={alertCount}/>
 
-          {/* Dashboard */}
-          <Link to="/dashboard" className={`sidebar-link ${isActive("/dashboard") ? "active" : ""}`}>
-            <span className="sidebar-icon">📈</span>
-            {!collapsed && <span>Dashboard</span>}
-          </Link>
+          {!collapsed && <span className="sb-section">Gestão</span>}
+
+          <NavGroup icon={<IconBarChart size={20}/>} label="Inteligência" id="intel"
+            open={openMenu === "intel"} collapsed={collapsed} onToggle={() => toggle("intel")}>
+            <SubLink to="/relatorios" label="Relatórios" active={active("/relatorios")}/>
+            <SubLink to="/demanda" label="Demanda" active={active("/demanda")}/>
+          </NavGroup>
+
+          <NavLink to="/funcionarios" icon={<IconUsers size={20}/>} label="Funcionários" active={active("/funcionarios")} collapsed={collapsed}/>
+
+          <NavLink to="/armario" icon={<IconArchive size={20}/>} label="Armário" active={active("/armario")} collapsed={collapsed}/>
+          <NavLink to="/dashboard" icon={<IconTrendingUp size={20}/>} label="Dashboard" active={active("/dashboard")} collapsed={collapsed}/>
+
         </nav>
 
-        {/* Footer */}
-        <div className="sidebar-footer">
-          <button className="sidebar-theme-btn" onClick={toggleTheme}>
-            {theme === "dark" ? "☀️" : "🌙"} {!collapsed && (theme === "dark" ? "Modo Claro" : "Modo Escuro")}
+        {/* ── Footer ── */}
+        <div className="sb-footer">
+          <button className="sb-theme" onClick={toggleTheme}>
+            {theme === "dark" ? <IconSun size={16}/> : <IconMoon size={16}/>}
+            {!collapsed && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
-          <div className="sidebar-user">
-            {!collapsed && <span className="sidebar-username">{user?.name}</span>}
-            <Link to="/login" className="sidebar-logout" onClick={logout}>
-              {collapsed ? "🚪" : "Sair"}
+          <div className="sb-user">
+            <div className="sb-avatar">{initials}</div>
+            {!collapsed && (
+              <div className="sb-user-info">
+                <span className="sb-user-name">{user?.name}</span>
+                <span className="sb-user-role">{user?.role}</span>
+              </div>
+            )}
+            <Link to="/login" className="sb-logout" onClick={logout} title="Sair">
+              <IconLogOut size={16}/>
             </Link>
           </div>
         </div>
+
       </aside>
     </>
   );
 };
+
+/* ── Sub-components ── */
+interface NavLinkProps {
+  to: string; icon: React.ReactNode; label: string;
+  active: boolean; collapsed: boolean; badge?: number;
+}
+
+const NavLink = ({ to, icon, label, active, collapsed, badge }: NavLinkProps) => (
+  <Link to={to} className={`sb-link ${active ? "sb-link--active" : ""}`} title={collapsed ? label : undefined}>
+    <span className="sb-link-icon">{icon}</span>
+    {!collapsed && <span className="sb-link-label">{label}</span>}
+    {badge && badge > 0 && (
+      <span className={`sb-badge ${collapsed ? "sb-badge--mini" : ""}`}>{badge}</span>
+    )}
+  </Link>
+);
+
+interface NavGroupProps {
+  icon: React.ReactNode; label: string; id: string;
+  open: boolean; collapsed: boolean; onToggle: () => void; children: React.ReactNode;
+}
+
+const NavGroup = ({ icon, label, open, collapsed, onToggle, children }: NavGroupProps) => (
+  <div className="sb-group">
+    <button className="sb-link sb-link--group" onClick={onToggle}>
+      <span className="sb-link-icon">{icon}</span>
+      {!collapsed && (
+        <>
+          <span className="sb-link-label">{label}</span>
+          <span className={`sb-chevron ${open ? "sb-chevron--open" : ""}`}>
+            <IconChevronDown size={12}/>
+          </span>
+        </>
+      )}
+    </button>
+    {open && !collapsed && <ul className="sb-submenu">{children}</ul>}
+  </div>
+);
+
+interface SubLinkProps { to: string; label: string; active: boolean; }
+const SubLink = ({ to, label, active }: SubLinkProps) => (
+  <li>
+    <Link to={to} className={`sb-sublink ${active ? "sb-sublink--active" : ""}`}>
+      <span className="sb-sublink-dot"/>
+      {label}
+    </Link>
+  </li>
+);
 
 export default Sidebar;

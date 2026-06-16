@@ -3,9 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Login from "./pages/Login/Login";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Armario from "./pages/Armario/Armario";
-import Funcionario from "./pages/Funcionarios/Funcionario";
-import CadastraFuncionario from "./pages/Funcionarios/CadastraFuncionario";
-import AtualizaFuncionario from "./pages/Funcionarios/AtualizaFuncionario";
+import Funcionario from "./pages/Funcionarios/Funcionarios";
 import Estoque from "./pages/Item/Estoque";
 import SaidaItens from "./pages/Item/SaidaItens";
 import TodasSaidas from "./pages/Item/TodasSaidas";
@@ -21,6 +19,7 @@ import Relatorios from "./pages/Item/Relatorios";
 import Sugestoes from "./pages/Item/Sugestoes";
 import Descartados from "./pages/Item/Descartados";
 import Lavanderia from "./pages/Item/Lavanderia";
+import Hoje from "./pages/Dashboard/Hoje";
 
 const AppLayout = () => {
   return (
@@ -49,13 +48,11 @@ const AppRoutes = () => {
             <Route element={<AdminRoutes />}>
               <Route element={<AppLayout />}>
                 <Route path="/registro" element={<Register />} />
+                <Route path="/hoje" element={<Hoje />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/armario" element={<Armario />} />
                 <Route path="/funcionarios" element={<Funcionario />} />
                 <Route path="/funcionarios/:tipo" element={<Funcionario />} />
-                <Route path="/cadastrarfuncionario" element={<CadastraFuncionario />} />
-                <Route path="/atualizarfuncionario/:id" element={<AtualizaFuncionario />} />
-                <Route path="/novosfuncionarios" element={<Funcionario />} />
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/saidas" element={<TodasSaidas />} />
                 <Route path="/saida/:id" element={<SaidaItens />} />

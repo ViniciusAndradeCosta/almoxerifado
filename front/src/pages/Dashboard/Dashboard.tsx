@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { CalendarIcon, FilterIcon, DownloadIcon, RefreshCw } from 'lucide-react';
+import { CalendarIcon, DownloadIcon, RefreshCw } from 'lucide-react';
 import api from '../../services/useApi';
 import { AllWithdrawal } from '../../types/AllWithdrawal';
 
