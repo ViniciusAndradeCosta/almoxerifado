@@ -269,7 +269,8 @@ const Estoque = () => {
                   <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>{item.size || "—"}</td>
                   <td style={{ textAlign: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                      <td style={{ textAlign: "center" }}>
+                      {/* ALTERAÇÃO: Trocado <td> por <div> para evitar o erro de validação do DOM */}
+                      <div style={{ textAlign: "center" }}>
                         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: "0.82rem",
                           color: (item.quantity ?? 0) === 0 ? "var(--danger)" : (item.quantity ?? 0) <= 10 ? "var(--warning)" : "var(--text-primary)"
                         }}>
@@ -280,7 +281,7 @@ const Estoque = () => {
                             {(item.quantity ?? 0) - (item as any).quantityReturned} novos + {(item as any).quantityReturned} devolvidos
                           </div>
                         )}
-                      </td>
+                      </div>
                       {/* Identificador: item tem devoluções registradas */}
                       {returnStats[item.id!]?.devolvidoEstoque > 0 && (
                         <span title={`${returnStats[item.id!].devolvidoEstoque} un. devolvida(s) ao estoque`} style={{

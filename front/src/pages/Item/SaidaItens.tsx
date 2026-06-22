@@ -164,6 +164,8 @@ const SaidaItens = () => {
     </div>
   );
 
+  const dataMinSaida = (() => { const d = new Date(); d.setDate(d.getDate() - 20); return d.toISOString().split("T")[0]; })();
+  const dataMaxSaida = new Date().toISOString().split("T")[0];
   const totalItens  = saidas.reduce((acc, s) => acc + s.quantity, 0);
   const ultimaSaida = saidas.length > 0
     ? [...saidas].sort((a, b) => new Date(b.withdrawalDate).getTime() - new Date(a.withdrawalDate).getTime())[0]

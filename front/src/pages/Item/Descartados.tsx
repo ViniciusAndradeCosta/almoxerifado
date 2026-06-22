@@ -84,8 +84,8 @@ const Descartados = () => {
         setHighlightedItemIndex(-1);
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+        e?.preventDefault();
 
         if (!selectedItemId) {
             window.alert("Selecione um item da lista!");
@@ -159,12 +159,14 @@ const Descartados = () => {
         return badges[reason] || "var(--text-secondary)";
     };
 
-    // Filtros
-    const filteredDiscards = discards.filter((d) => {
-        if (filtroMotivo && d.reason !== filtroMotivo) return false;
-        if (filtroNome && !d.item.name.toLowerCase().includes(filtroNome.toLowerCase())) return false;
-        return true;
-    });
+    // Filtros — mantém mais recentes primeiro
+    const filteredDiscards = discards
+        .filter((d) => {
+            if (filtroMotivo && d.reason !== filtroMotivo) return false;
+            if (filtroNome && !d.item.name.toLowerCase().includes(filtroNome.toLowerCase())) return false;
+            return true;
+        })
+        .sort((a, b) => new Date(b.discardDate).getTime() - new Date(a.discardDate).getTime());
 
     // Resumo
     const totalDescartado = filteredDiscards.reduce((acc, d) => acc + d.quantity, 0);
@@ -230,7 +232,7 @@ const Descartados = () => {
                     </div>
                 </div>
                 
-                <form onSubmit={handleSubmit} style={{ padding: "16px 18px" }}>
+                <div style={{ padding: "16px 18px" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr", gap: 14, marginBottom: 14 }}>
                         {/* Item */}
                         <div>
@@ -344,11 +346,11 @@ const Descartados = () => {
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: "1px dashed var(--border)" }}>
-                        <button type="submit" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 24px", borderRadius: 7, border: "none", background: "var(--danger)", color: "#fff", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
+                        <button type="button" onClick={handleSubmit as any} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 24px", borderRadius: 7, border: "none", background: "var(--danger)", color: "#fff", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
                             Registrar Descarte
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
 
             {/* Histórico / Tabela */}

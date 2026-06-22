@@ -11,8 +11,19 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+// Busca o item no banco cujo nome esteja CONTIDO na descrição extraída da NF.
+// O Prisma só faz "banco contains NF", mas o correto é "NF contains banco".
+// Por isso carregamos todos os itens e filtramos em JS.
+// Ex: banco tem "BLUSA DE MOLETOM", NF tem "BLUSA DE MOLETOM" → match.
+//     banco tem "BLUSA DE MOLETOM", NF tem "BLUSA DE MOLETOM CINZA M" → match.
+async function buscarItemNoBanco(descricaoNF) {
+  const todosItens = await prisma.item.findMany({ select: { id: true, name: true } });
+  const descricaoUpper = descricaoNF.toUpperCase();
+  return todosItens.find(item => descricaoUpper.includes(item.name.toUpperCase())) || null;
+}
+
 // POST /invoices/upload — recebe o arquivo via multer (req.file) + metadados.
-// Se for PDF, tenta extrair automaticamente fornecedor/número/data;
+// Se for PDF, tenta extrair automaticamente fornecedor/número/data/itens;
 // os campos enviados manualmente pelo usuário sempre têm prioridade.
 export async function uploadInvoice(req, res) {
   try {
@@ -24,7 +35,7 @@ export async function uploadInvoice(req, res) {
     const filePath = path.join(UPLOAD_DIR, req.file.filename);
 
     // Extração automática apenas para PDFs
-    let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, confidence: {} };
+    let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [], confidence: {} };
     if (req.file.mimetype === "application/pdf") {
       extraido = await extrairDadosNotaFiscal(filePath);
     }
@@ -48,19 +59,62 @@ export async function uploadInvoice(req, res) {
       },
     });
 
+    // ── Entrada automática no estoque pelos itens extraídos da NF ──
+    const entradasRealizadas = [];
+    const entradasIgnoradas  = [];
+
+    if (extraido.itens && extraido.itens.length > 0) {
+      for (const itemNF of extraido.itens) {
+        // CORRIGIDO: busca se a descrição da NF contém o nome do item do banco
+        const itemBanco = await buscarItemNoBanco(itemNF.descricao);
+
+        if (itemBanco) {
+          await prisma.$transaction([
+            prisma.stockEntry.create({
+              data: {
+                itemId:    itemBanco.id,
+                quantity:  itemNF.quantidade,
+                entryDate: dataFinal || new Date(),
+                supplier:  fornecedorFinal,
+                notes:     `Entrada automática via NF-e ${numeroFinal || ""}`.trim(),
+              },
+            }),
+            prisma.item.update({
+              where: { id: itemBanco.id },
+              data:  { quantity: { increment: itemNF.quantidade } },
+            }),
+          ]);
+          entradasRealizadas.push({
+            descricao:  itemNF.descricao,
+            quantidade: itemNF.quantidade,
+            itemId:     itemBanco.id,
+            itemName:   itemBanco.name,
+          });
+        } else {
+          entradasIgnoradas.push({ descricao: itemNF.descricao, quantidade: itemNF.quantidade });
+        }
+      }
+    }
+
     return res.status(201).json({
       success: true,
       invoice,
       extraido: {
-        supplier: extraido.supplier,
+        supplier:      extraido.supplier,
         invoiceNumber: extraido.invoiceNumber,
-        invoiceDate: extraido.invoiceDate,
-        confidence: extraido.confidence,
+        invoiceDate:   extraido.invoiceDate,
+        confidence:    extraido.confidence,
+        itens:         extraido.itens || [],
         usouExtracao: {
-          supplier: !supplier && !!extraido.supplier,
+          supplier:      !supplier      && !!extraido.supplier,
           invoiceNumber: !invoiceNumber && !!extraido.invoiceNumber,
-          invoiceDate: !invoiceDate && !!extraido.invoiceDate,
+          invoiceDate:   !invoiceDate   && !!extraido.invoiceDate,
         },
+      },
+      estoque: {
+        entradasRealizadas,
+        entradasIgnoradas,
+        total: entradasRealizadas.length,
       },
     });
   } catch (error) {
@@ -82,21 +136,21 @@ export async function extractInvoiceData(req, res) {
 
     const filePath = path.join(UPLOAD_DIR, req.file.filename);
 
-    let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, confidence: {} };
+    let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [], confidence: {} };
     if (req.file.mimetype === "application/pdf") {
       extraido = await extrairDadosNotaFiscal(filePath);
     }
 
-    // Remove o arquivo temporário — esse endpoint é só para pré-visualização,
-    // o upload definitivo acontece em /invoices/upload
+    // Remove o arquivo temporário — esse endpoint é só para pré-visualização
     fs.unlinkSync(filePath);
 
     return res.json({
-      success: true,
-      supplier: extraido.supplier,
+      success:       true,
+      supplier:      extraido.supplier,
       invoiceNumber: extraido.invoiceNumber,
-      invoiceDate: extraido.invoiceDate,
-      confidence: extraido.confidence,
+      invoiceDate:   extraido.invoiceDate,
+      itens:         extraido.itens || [],
+      confidence:    extraido.confidence,
     });
   } catch (error) {
     if (req.file) {

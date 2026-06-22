@@ -227,7 +227,7 @@ const EntradaEstoque = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {entries.map(entry => (
+                                {[...entries].sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()).map(entry => (
                                     <tr key={entry.id}>
                                         <td style={{ fontWeight: 600, fontSize: "0.8rem" }}>{entry.item?.name || "—"}</td>
                                         <td style={{ fontSize: "0.76rem", color: "var(--brand)", fontWeight: 700 }}>{entry.item?.size || "—"}</td>

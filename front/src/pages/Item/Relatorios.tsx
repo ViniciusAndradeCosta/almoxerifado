@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../services/useApi";
 import { Item } from "../../types/Item";
-import { formatDate } from "../../utils/dateFunctions";
 
 interface ReportData {
     item: {
@@ -46,6 +45,7 @@ const Relatorios = () => {
 
     // Relatório por item
     const [itemSearch, setItemSearch] = useState("");
+    const [highlightedItemIndex, setHighlightedItemIndex] = useState(-1);
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
     const [dataInicio, setDataInicio] = useState("");
     const [dataFim, setDataFim] = useState("");
@@ -238,30 +238,41 @@ const Relatorios = () => {
                         <div className="card-body">
                             <h5 className="card-title">Relatório por Item</h5>
                             <div className="row g-3 align-items-end">
-                                <div className="col-md-4 position-relative">
-                                    <label className="form-label">Item</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        value={itemSearch}
-                                        onChange={(e) => handleItemSearch(e.target.value)}
-                                        placeholder="Digite o nome do item..."
-                                        autoComplete="off"
-                                    />
-                                    {filteredItems.length > 0 && (
-                                        <ul className="list-group position-absolute w-100" style={{ zIndex: 1000, maxHeight: "200px", overflowY: "auto" }}>
-                                            {filteredItems.map((item) => (
-                                                <li
-                                                    key={item.id}
-                                                    className="list-group-item list-group-item-action"
-                                                    style={{ cursor: "pointer" }}
-                                                    onClick={() => handleSelectItem(item)}
-                                                >
-                                                    {item.name} — {item.type}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                <div className="col-md-4" style={{ position: "relative" }}>
+                                    <label style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-secondary)", marginBottom: 5, display: "block" }}>Item</label>
+                                    <div style={{ position: "relative" }}>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={itemSearch}
+                                            onChange={(e) => handleItemSearch(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (!filteredItems.length) return;
+                                                if (e.key === "ArrowDown") { e.preventDefault(); setHighlightedItemIndex((p: number) => Math.min(p + 1, filteredItems.length - 1)); }
+                                                else if (e.key === "ArrowUp") { e.preventDefault(); setHighlightedItemIndex((p: number) => Math.max(p - 1, 0)); }
+                                                else if (e.key === "Enter") { e.preventDefault(); if (highlightedItemIndex >= 0) handleSelectItem(filteredItems[highlightedItemIndex]); }
+                                                else if (e.key === "Escape") { setFilteredItems([]); setHighlightedItemIndex(-1); }
+                                            }}
+                                            placeholder="Digite o nome do item..."
+                                            autoComplete="off"
+                                            style={{ paddingRight: 32 }}
+                                        />
+                                        {filteredItems.length > 0 && (
+                                            <ul style={{ position: "absolute", width: "100%", zIndex: 30, marginTop: 4, padding: 0, listStyle: "none", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+                                                {filteredItems.map((item, idx) => (
+                                                    <li
+                                                        key={item.id}
+                                                        onMouseDown={e => { e.preventDefault(); handleSelectItem(item); }}
+                                                        onMouseEnter={() => setHighlightedItemIndex(idx)}
+                                                        style={{ padding: "8px 12px", cursor: "pointer", background: idx === highlightedItemIndex ? "var(--brand)" : "transparent", color: idx === highlightedItemIndex ? "#fff" : "var(--text-primary)", transition: "background 0.1s", borderBottom: idx < filteredItems.length - 1 ? "1px solid var(--border)" : "none" }}
+                                                    >
+                                                        <div style={{ fontWeight: 600, fontSize: "0.78rem" }}>{item.name}</div>
+                                                        <div style={{ fontSize: "0.68rem", color: idx === highlightedItemIndex ? "rgba(255,255,255,0.8)" : "var(--text-muted)" }}>{item.type} · {item.sector}</div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="col-md-3">
                                     <label className="form-label">Data Início</label>
