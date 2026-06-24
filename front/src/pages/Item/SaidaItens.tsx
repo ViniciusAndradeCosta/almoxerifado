@@ -9,7 +9,7 @@ import { Withdrawal } from "../../types/Withdrawal";
 import { SearchDropdown } from "../../components/SearchDropdown";
 import {
   IconX, IconEdit, IconTrash, IconDownload,
-  IconCheckCircle, IconPackage, IconUsers, IconArrowRight, IconCalendar
+  IconCheckCircle, IconPackage, IconUsers, IconArrowRight, IconCalendar, IconRefreshCw
 } from "../../components/Icons";
 
 interface Cabinet {
@@ -221,6 +221,11 @@ const SaidaItens = () => {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => navigate(`/funcionarios?trocar=${id}`)}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--info)", border: "none", borderRadius: 7, color: "#fff", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>
+            <IconRefreshCw size={13}/> Trocar Função
+          </button>
           <button onClick={handleDownloadFicha} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--text-secondary)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
             <IconDownload size={13}/> Baixar Ficha
           </button>

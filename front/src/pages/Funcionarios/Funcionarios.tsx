@@ -6,13 +6,14 @@ import { Employee } from "../../types/Employee";
 import { formatDate } from "../../utils/dateFunctions";
 import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS } from "../../constants/uniformesPorSetor";
 import { company } from "./EmployeeTypes";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   IconUsers, IconPlus, IconEdit, IconTrash, IconSearch,
-  IconX, IconDownload, IconCheckCircle, IconArrowRight, IconPackage
+  IconX, IconDownload, IconCheckCircle, IconArrowRight, IconPackage,
+  IconRefreshCw, IconCornerDownLeft
 } from "../../components/Icons";
 
-type Modo = "cadastro" | "edicao" | "saidas";
+type Modo = "cadastro" | "edicao" | "saidas" | "troca";
 
 interface ItemEstoque {
   id: number; name: string; type: string; sector: string; size: string; quantity: number;
@@ -29,6 +30,13 @@ interface EntregaItem {
 }
 
 // Item do kit pré-carregado — aguarda tamanho do usuário para vincular ao estoque
+interface TrocaItem {
+  nomeKit: string;
+  acao: "DEVOLVER" | "MANTER" | "NOVO";
+  motivo: string;
+  destinoDevolucao: "ESTOQUE" | "DESCARTE"; // só relevante quando acao === DEVOLVER
+}
+
 interface KitItemForm {
   nomeKit: string;       // nome da planilha (ex: "CAMISA")
   ca?: string;           // CA do EPI (se aplicável)
@@ -70,6 +78,13 @@ const Funcionarios = () => {
   // primeiroItemQty removido — quantidade vem do kit
   const [entregaItens, setEntregaItens]                   = useState<EntregaItem[]>([]);
   const [kitItensForm, setKitItensForm]                   = useState<KitItemForm[]>([]);
+
+  // Troca de função
+  const [novoDepartamento, setNovoDepartamento]           = useState("");
+  const [novoCargo, setNovoCargo]                         = useState("");
+  const [itensTroca, setItensTroca]                       = useState<TrocaItem[]>([]);
+  const [salvandoTroca, setSalvandoTroca]                 = useState(false);
+  const [todosItensEstoque, setTodosItensEstoque]         = useState<ItemEstoque[]>([]);
   const [dropdownPos, setDropdownPos]                     = useState<{ top: number; left: number; width: number } | null>(null);
   const [highlightedIndex, setHighlightedIndex]           = useState<number>(-1);
   const primeiroItemInputRef                              = useRef<HTMLInputElement>(null);
@@ -162,6 +177,124 @@ const Funcionarios = () => {
       );
       setSaidas(filtradas);
     } catch (e) { setSaidas([]); }
+  };
+
+  const openTroca = (emp: Employee) => {
+    setSelected(emp);
+    setNovoDepartamento(emp.department || "");
+    setNovoCargo(emp.role || "");
+    setItensTroca([]);
+    setModo("troca");
+    setPanelOpen(true);
+  };
+
+  const calcularDiferencaKit = (deptAntigo: string, deptNovo: string): TrocaItem[] => {
+    const kitAntigo = UNIFORMES_POR_SETOR[deptAntigo];
+    const kitNovo   = UNIFORMES_POR_SETOR[deptNovo];
+    const itensAntigos = [...(kitAntigo?.uniformes || []), ...(kitAntigo?.epis || [])];
+    const itensNovos   = [...(kitNovo?.uniformes   || []), ...(kitNovo?.epis   || [])];
+    const GENERICOS    = ["CAMISA", "CALÇA", "MOLETON", "CALÇADO"];
+    const ehGenerico   = (nome: string) => GENERICOS.some(g => nome.toUpperCase().includes(g));
+    const resultado: TrocaItem[] = [];
+    itensAntigos.forEach(item => {
+      const noNovo = itensNovos.some(n => n.nome.toUpperCase() === item.nome.toUpperCase());
+      if (noNovo) {
+        resultado.push({ nomeKit: item.nome, acao: "MANTER", motivo: "Presente nos dois kits", destinoDevolucao: "ESTOQUE" });
+      } else if (ehGenerico(item.nome)) {
+        resultado.push({ nomeKit: item.nome, acao: "MANTER", motivo: "Item genérico — mantido", destinoDevolucao: "ESTOQUE" });
+      } else {
+        resultado.push({ nomeKit: item.nome, acao: "DEVOLVER", motivo: "Exclusivo da função anterior", destinoDevolucao: "ESTOQUE" });
+      }
+    });
+    itensNovos.forEach(item => {
+      const noAntigo = itensAntigos.some(a => a.nome.toUpperCase() === item.nome.toUpperCase());
+      if (!noAntigo) {
+        resultado.push({ nomeKit: item.nome, acao: "NOVO", motivo: "Novo item para esta função", destinoDevolucao: "ESTOQUE" });
+      }
+    });
+    return resultado;
+  };
+
+  const setDestinoDevolucao = (nomeKit: string, destino: "ESTOQUE" | "DESCARTE") => {
+    setItensTroca(prev => prev.map(i => i.nomeKit === nomeKit ? { ...i, destinoDevolucao: destino } : i));
+  };
+
+  const handleTrocarFuncao = async () => {
+    if (!selected || !novoDepartamento) { window.alert("Selecione o novo departamento."); return; }
+    const itensDevolver = itensTroca.filter(i => i.acao === "DEVOLVER");
+    const itensNovos    = itensTroca.filter(i => i.acao === "NOVO");
+
+    if (!window.confirm(
+      "Confirmar troca de função de " + selected.name + "?" +
+      "\n\nDe: " + selected.department + " → " + selected.role +
+      "\nPara: " + novoDepartamento + " → " + (novoCargo || selected.role) +
+      (itensDevolver.length > 0 ? "\n\nItens a devolver: " + itensDevolver.map(i => i.nomeKit).join(", ") : "") +
+      (itensNovos.length > 0 ? "\nItens novos a entregar: " + itensNovos.map(i => i.nomeKit).join(", ") : "")
+    )) return;
+
+    try {
+      setSalvandoTroca(true);
+
+      // 1. Atualizar departamento e cargo
+      await api.put("/employee/" + selected.id, {
+        name: selected.name, company: selected.company,
+        role: novoCargo || selected.role, department: novoDepartamento,
+        admissionDate: selected.admissionDate,
+        shirt_size: selected.shirt_size, pants_size: selected.pants_size, shoes_size: selected.shoes_size,
+      });
+
+      // 2. Devolver itens exclusivos da função anterior
+      const saidasRes = await api.get("/getitemsout/" + selected.id);
+      const saidasAtivas = saidasRes.data || [];
+
+      for (const itemTroca of itensDevolver) {
+        const primeiraP = itemTroca.nomeKit.split(" ")[0].toUpperCase();
+        const saida = saidasAtivas.find((s: any) => s.item?.name?.toUpperCase().includes(primeiraP));
+        if (saida) {
+          if (itemTroca.destinoDevolucao === "DESCARTE") {
+            // Remove da ficha sem devolver ao estoque + registra descarte
+            await api.delete("/returnitem/" + saida.id);
+            await api.post("/discard", {
+              itemId: saida.item.id, quantity: saida.quantity,
+              reason: "TROCA_FUNCAO",
+              notes: "Descarte por troca de função: " + selected.department + " → " + novoDepartamento,
+              discardedBy: selected.name, discardDate: new Date().toISOString(),
+            });
+          } else {
+            // Devolve ao estoque
+            await api.delete("/returnitemandaddquantity/" + saida.id);
+          }
+        }
+      }
+
+      // 3. Registrar saídas dos novos itens do kit
+      for (const itemNovo of itensNovos) {
+        const primeiraP = itemNovo.nomeKit.split(" ")[0].toUpperCase();
+        const itemEstoque = todosItensEstoque.find(i => i.name.toUpperCase().includes(primeiraP));
+        if (itemEstoque && itemEstoque.quantity > 0) {
+          await api.post("/giveitem", {
+            employeeId: selected.id, itemId: itemEstoque.id,
+            quantity: 1, withdrawalDate: new Date().toISOString(),
+          });
+        }
+      }
+
+      const resumo = [
+        "Troca de função registrada com sucesso!",
+        "Departamento: " + novoDepartamento,
+        itensDevolver.length > 0 ? itensDevolver.length + " item(ns) devolvido(s)" : "",
+        itensNovos.filter(i => todosItensEstoque.find(e => e.name.toUpperCase().includes(i.nomeKit.split(" ")[0].toUpperCase()) && e.quantity > 0)).length > 0
+          ? "Novos itens entregues automaticamente" : "",
+      ].filter(Boolean).join("\n");
+      window.alert(resumo);
+
+      closePanel();
+      fetchAll();
+    } catch(e: any) {
+      window.alert(e.response?.data?.error || "Erro ao registrar troca de função.");
+    } finally {
+      setSalvandoTroca(false);
+    }
   };
 
   const closePanel = () => {
@@ -493,6 +626,9 @@ const Funcionarios = () => {
                           <Link to={`/saida/${emp.id}`} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", fontSize: "0.7rem", fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
                             <IconArrowRight size={11}/> Saídas
                           </Link>
+                          <button onClick={() => openTroca(emp)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "none", background: "var(--info)", color: "#fff", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            <IconRefreshCw size={11}/> Trocar Função
+                          </button>
                           <button onClick={() => openEdicao(emp)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "none", background: "#2563EB", color: "#fff", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>
                             <IconEdit size={11}/> Editar
                           </button>
@@ -540,7 +676,7 @@ const Funcionarios = () => {
                 </div>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: "0.9rem" }}>
-                    {modo === "cadastro" ? "Novo Funcionário" : modo === "edicao" ? "Editar Funcionário" : "Histórico de Saídas"}
+                    {modo === "cadastro" ? "Novo Funcionário" : modo === "edicao" ? "Editar Funcionário" : modo === "troca" ? "Trocar Função" : "Histórico de Saídas"}
                   </div>
                   {selected && modo !== "cadastro" && (
                     <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 1 }}>{selected.name}</div>
@@ -830,6 +966,126 @@ const Funcionarios = () => {
                 </div>
               )}
 
+              {/* ── TROCA DE FUNÇÃO ── */}
+              {modo === "troca" && selected && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+                  {/* Função atual */}
+                  <div style={{ padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                    <div style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase" as const, color: "var(--text-muted)", marginBottom: 4 }}>Função Atual</div>
+                    <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>{selected.department}</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{selected.role}</div>
+                  </div>
+
+                  {/* Nova função */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div>
+                      <label style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, color: "var(--text-secondary)", marginBottom: 5, display: "block" }}>Novo Departamento *</label>
+                      <select className="form-select" value={novoDepartamento}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setNovoDepartamento(v);
+                          setItensTroca(v && selected.department ? calcularDiferencaKit(selected.department, v) : []);
+                        }}>
+                        <option value="">Selecione...</option>
+                        {SETORES_DISPONIVEIS.map(s => <option key={s} value={s}>{s}</option>)}
+                        <option value="OUTRO">OUTRO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, color: "var(--text-secondary)", marginBottom: 5, display: "block" }}>Novo Cargo</label>
+                      <input className="form-control" value={novoCargo} onChange={e => setNovoCargo(e.target.value)} placeholder="Ex: Operador de Caixa"/>
+                    </div>
+                  </div>
+
+                  {/* Análise */}
+                  {itensTroca.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+                      {/* DEVOLVER — com seletor Estoque/Descarte */}
+                      {itensTroca.filter(i => i.acao === "DEVOLVER").length > 0 && (
+                        <div>
+                          <div style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase" as const, color: "var(--danger)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                            <IconCornerDownLeft size={12} color="var(--danger)"/>
+                            Devolver ({itensTroca.filter(i => i.acao === "DEVOLVER").length}) — selecione o destino
+                          </div>
+                          {itensTroca.filter(i => i.acao === "DEVOLVER").map((item, idx) => (
+                            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "8px 12px", background: "var(--danger-subtle)", border: "1px solid var(--danger)", borderRadius: 6, marginBottom: 6 }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: "0.78rem" }}>{item.nomeKit}</div>
+                                <div style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>{item.motivo}</div>
+                              </div>
+                              <div style={{ display: "flex", gap: 5 }}>
+                                {(["ESTOQUE", "DESCARTE"] as const).map(dest => (
+                                  <button key={dest} type="button"
+                                    onClick={() => setDestinoDevolucao(item.nomeKit, dest)}
+                                    style={{ padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontSize: "0.68rem", fontWeight: 700, border: `1px solid ${item.destinoDevolucao === dest ? (dest === "ESTOQUE" ? "var(--success)" : "var(--danger)") : "var(--border)"}`, background: item.destinoDevolucao === dest ? (dest === "ESTOQUE" ? "var(--success)" : "var(--danger)") : "var(--surface)", color: item.destinoDevolucao === dest ? "#fff" : "var(--text-secondary)" }}>
+                                    {dest === "ESTOQUE" ? "Estoque" : "Descartar"}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* MANTER */}
+                      {itensTroca.filter(i => i.acao === "MANTER").length > 0 && (
+                        <div>
+                          <div style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase" as const, color: "var(--success)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                            <IconCheckCircle size={12} color="var(--success)"/>
+                            Manter ({itensTroca.filter(i => i.acao === "MANTER").length})
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {itensTroca.filter(i => i.acao === "MANTER").map((item, idx) => (
+                              <span key={idx} style={{ padding: "3px 10px", borderRadius: 4, background: "var(--success-subtle)", border: "1px solid var(--success)", fontSize: "0.72rem", fontWeight: 600, color: "var(--success)" }}>
+                                {item.nomeKit}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* NOVOS — saída automática */}
+                      {itensTroca.filter(i => i.acao === "NOVO").length > 0 && (
+                        <div>
+                          <div style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase" as const, color: "var(--info)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                            <IconPackage size={12} color="var(--info)"/>
+                            Novos Itens — saída registrada automaticamente ({itensTroca.filter(i => i.acao === "NOVO").length})
+                          </div>
+                          {itensTroca.filter(i => i.acao === "NOVO").map((item, idx) => {
+                            const primeiraP = item.nomeKit.split(" ")[0].toUpperCase();
+                            const itemEstoque = todosItensEstoque.find(i => i.name.toUpperCase().includes(primeiraP));
+                            const temEstoque = itemEstoque && itemEstoque.quantity > 0;
+                            return (
+                              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 12px", background: "var(--info-subtle)", border: "1px solid var(--info)", borderRadius: 6, marginBottom: 5, fontSize: "0.78rem" }}>
+                                <div>
+                                  <span style={{ fontWeight: 600 }}>{item.nomeKit}</span>
+                                  {itemEstoque && <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginLeft: 8 }}>{itemEstoque.name}</span>}
+                                </div>
+                                <span style={{ fontSize: "0.68rem", fontWeight: 700, color: temEstoque ? "var(--success)" : "var(--danger)" }}>
+                                  {temEstoque ? `${itemEstoque!.quantity} em estoque` : "Sem estoque"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          <div style={{ padding: "7px 10px", background: "var(--brand-subtle)", border: "1px solid var(--brand)", borderRadius: 5, fontSize: "0.72rem", color: "var(--brand)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconCheckCircle size={11} color="var(--brand)"/>
+                            Itens com estoque disponível serão entregues automaticamente ao confirmar.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {novoDepartamento && itensTroca.length === 0 && (
+                    <div style={{ padding: "12px", background: "var(--surface-2)", borderRadius: 8, fontSize: "0.78rem", color: "var(--text-muted)", textAlign: "center" }}>
+                      Kit não mapeado — a troca atualizará o departamento sem análise automática de uniformes.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── SAÍDAS ── */}
               {modo === "saidas" && (
                 <div>
@@ -866,6 +1122,16 @@ const Funcionarios = () => {
               )}
             </div>
 
+            {/* Footer modal */}
+            {modo === "troca" && (
+              <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0, background: "var(--surface-2)", borderRadius: "0 0 12px 12px" }}>
+                <button onClick={closePanel} style={{ padding: "8px 20px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-secondary)", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+                <button onClick={handleTrocarFuncao} disabled={salvandoTroca || !novoDepartamento}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 24px", borderRadius: 7, border: "none", background: (!novoDepartamento || salvandoTroca) ? "var(--surface-2)" : "var(--info)", color: (!novoDepartamento || salvandoTroca) ? "var(--text-muted)" : "#fff", fontSize: "0.78rem", fontWeight: 700, cursor: (!novoDepartamento || salvandoTroca) ? "not-allowed" : "pointer" }}>
+                  {salvandoTroca ? <><span className="spinner-border spinner-border-sm"/> Registrando...</> : <><IconRefreshCw size={13}/> Confirmar Troca de Função</>}
+                </button>
+              </div>
+            )}
             {/* Footer modal */}
             {(modo === "cadastro" || modo === "edicao") && (
               <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0, background: "var(--surface-2)", borderRadius: "0 0 12px 12px" }}>

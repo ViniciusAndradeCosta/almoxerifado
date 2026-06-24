@@ -212,4 +212,23 @@ export const IconCalendar = ({ size = 16, color = "currentColor" }: IconProps) =
     <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
     <line x1="3" y1="10" x2="21" y2="10"/>
   </svg>
+
+
+);
+
+// Adicionar ao final do arquivo Icons.tsx existente:
+
+export const IconRefreshCw = ({ size = 16, color = "currentColor" }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </svg>
+);
+
+export const IconCornerDownLeft = ({ size = 16, color = "currentColor" }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 10 4 15 9 20"/>
+    <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+  </svg>
 );
