@@ -159,14 +159,18 @@ const Descartados = () => {
         return badges[reason] || "var(--text-secondary)";
     };
 
-    // Filtros — mantém mais recentes primeiro
+    // Filtros — mais recentes primeiro (comparação de string ISO é segura para datas UTC)
     const filteredDiscards = discards
         .filter((d) => {
             if (filtroMotivo && d.reason !== filtroMotivo) return false;
             if (filtroNome && !d.item.name.toLowerCase().includes(filtroNome.toLowerCase())) return false;
             return true;
         })
-        .sort((a, b) => new Date(b.discardDate).getTime() - new Date(a.discardDate).getTime());
+        .sort((a, b) => {
+            const da = a.discardDate ? a.discardDate.substring(0, 19) : "";
+            const db = b.discardDate ? b.discardDate.substring(0, 19) : "";
+            return db.localeCompare(da);
+        });
 
     // Resumo
     const totalDescartado = filteredDiscards.reduce((acc, d) => acc + d.quantity, 0);
@@ -243,6 +247,13 @@ const Descartados = () => {
                                     className="form-control"
                                     value={itemSearch}
                                     onChange={(e) => handleItemSearch(e.target.value)}
+                                    onBlur={() => {
+                                        // Fecha o dropdown ao clicar fora (setTimeout permite que o onMouseDown do li dispare antes)
+                                        setTimeout(() => {
+                                            setFilteredItems([]);
+                                            setHighlightedItemIndex(-1);
+                                        }, 150);
+                                    }}
                                     onKeyDown={e => {
                                         if (filteredItems.length === 0) return;
                                         if (e.key === "ArrowDown") {

@@ -2,9 +2,6 @@ import fs from "fs";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 // Extrai fornecedor, número da NF, data de emissão e itens de um PDF de DANFE/NF-e.
-// Testado com o layout real: todo o conteúdo de cada item aparece em UMA ÚNICA LINHA
-// após extração por pdf-parse:
-//   "2000000000003 BLUSA DE MOLETOM 61052000 0102 5101 UN 145,000 68,00 9.860,00 ..."
 export async function extrairDadosNotaFiscal(filePath) {
   const resultado = {
     supplier: null,
@@ -19,18 +16,14 @@ export async function extrairDadosNotaFiscal(filePath) {
     const pdfData = await pdfParse(dataBuffer);
     const texto = pdfData.text;
 
-    // textoLimpo: usado para campos simples (número, data, fornecedor)
     const textoLimpo = texto.replace(/\s+/g, " ").trim();
-
-    resultado.textoCompleto = texto.slice(0, 3000); // para debug
+    resultado.textoCompleto = texto.slice(0, 3000); // Para debug
 
     // ── Número da NF-e ──
-    // Na NF real aparece como "Nº 135" ou "N° 135" ou "NF-e Nº 135"
-    // O padrão mais confiável é buscar o número que aparece logo após "Nº" no cabeçalho
     const padroesNumero = [
-      /NF-?e\s*N[°º]\s*(\d{1,9})/i,          // "NF-e Nº 135"
-      /N[°º]\s*(\d{1,9})\s*S[ée]rie/i,        // "Nº 135 Série"
-      /N[°º]\s*(\d{1,9})/i,                    // "Nº 135" (genérico, último recurso)
+      /NF-?e\s*N[°º]\s*(\d{1,9})/i,          
+      /N[°º]\s*(\d{1,9})\s*S[ée]rie/i,        
+      /N[°º]\s*(\d{1,9})/i,                   
     ];
     for (const padrao of padroesNumero) {
       const match = textoLimpo.match(padrao);
@@ -42,7 +35,6 @@ export async function extrairDadosNotaFiscal(filePath) {
     }
 
     // ── Data de Emissão ──
-    // Na NF real: "DATA DE EMISSÃO 18/05/2026"
     const padroesData = [
       /DATA\s*D[EA]\s*EMISS[ÃA]O\s*(\d{2}\/\d{2}\/\d{4})/i,
       /EMISS[ÃA]O\s*(\d{2}\/\d{2}\/\d{4})/i,
@@ -56,7 +48,6 @@ export async function extrairDadosNotaFiscal(filePath) {
         break;
       }
     }
-    // Fallback: primeira data dd/mm/yyyy encontrada no texto
     if (!resultado.invoiceDate) {
       const matchGenerico = textoLimpo.match(/(\d{2}\/\d{2}\/\d{4})/);
       if (matchGenerico) {
@@ -67,7 +58,6 @@ export async function extrairDadosNotaFiscal(filePath) {
     }
 
     // ── Fornecedor (Razão Social do emitente) ──
-    // Na NF real: "RECEBEMOS DE MIRAGE UNIFORMES LTDA OS PRODUTOS..."
     const padroesFornecedor = [
       /RECEBEMOS\s+DE\s+(.+?)\s+OS\s+PRODUTOS/i,
       /([A-ZÀ-Ú][A-ZÀ-Ú0-9\s\.\-&]{4,60}(?:LTDA|EIRELI|S\/A|S\.A\.|ME|EPP))\s*(?:Rua|Av\.|Avenida|CNPJ)/i,
@@ -82,80 +72,73 @@ export async function extrairDadosNotaFiscal(filePath) {
     }
 
     // ── Itens do Produto ──
-    //
-    // PROBLEMA IDENTIFICADO COM A NF REAL:
-    // O título da seção no DANFE é "DADOS DO PRODUTO/SERVIÇO" (com "/SERVIÇO"),
-    // e o pdf-parse coloca TUDO de cada item em UMA ÚNICA LINHA:
-    //
-    //   "2000000000003 BLUSA DE MOLETOM 61052000 0102 5101 UN 145,000 68,00 9.860,00 0,00 ..."
-    //
-    // Estratégia:
-    // 1. Extrair o bloco entre "DADOS DO PRODUTO" e "CALCULO DO ISSQN" (ou "DADOS ADICIONAIS")
-    // 2. Dentro do bloco, varrer linha a linha
-    // 3. Em cada linha, aplicar regex que captura código + descrição + unidade + quantidade
-    //    tudo de uma vez, pois estão na mesma linha.
     try {
-      // Aceita "DADOS DO PRODUTO" com ou sem "/SERVIÇO" e com ou sem acento
-      const blocoMatch = texto.match(
-        /DADOS\s+DO\s+PRODUTO(?:\/SERVI[ÇC]O)?\s*[\s\S]*?(?=CALCULO\s+DO\s+ISSQN|C[AÁ]LCULO\s+DO\s+IMPOSTO|DADOS\s+ADICIONAIS)/i
-      );
+      const linhas = texto.split("\n").map(l => l.trim());
+      let linhaAnterior = "";
 
-      if (blocoMatch) {
-        const linhas = blocoMatch[0].split("\n").map(l => l.trim()).filter(Boolean);
+      for (let i = 0; i < linhas.length; i++) {
+        const linha = linhas[i];
+        if (!linha) continue;
 
-        for (const linha of linhas) {
-          // Cada item começa com código numérico de 6–20 dígitos.
-          // Depois vem descrição livre, depois NCM (8 dígitos), CST, CFOP,
-          // unidade (UN/PC/PAR/CX/KG/MT etc.) e quantidade.
-          //
-          // Regex em duas etapas:
-          // 1. Confirma que a linha tem um código de produto no início
-          // 2. Captura descrição e quantidade
+        let descricaoEncontrada = null;
+        let quantidadeEncontrada = null;
 
-          // Passo 1: a linha começa com código numérico longo?
-          const mCodigo = linha.match(/^(\d{6,20})\s+(.+)$/);
-          if (!mCodigo) continue;
+        // PADRÃO 4: Texto 100% Aglutinado (Exclusivo para notas como a da Mirage)
+        // Ex: 2000000000003BLUSA DE MOLETOM6105200001025101UN145,00068,009...
+        const m4 = linha.match(/^(\d+)?(.*?)\d{8}\d{6,8}(UN|UNID|UND|PC|P[CÇ]S?|PAR|CX|KG|MT|M2|LT|GL|PR|CJ|PCT|KIT|JG)(\d+,\d{2,4})/i);
 
-          const restoLinha = mCodigo[2]; // tudo após o código
-
-          // Passo 2: dentro do resto, captura descrição (tudo antes do NCM de 8 dígitos)
-          // e depois busca unidade + quantidade
-          // Formato: "BLUSA DE MOLETOM 61052000 0102 5101 UN 145,000 68,00 ..."
-          const mItem = restoLinha.match(
-            /^(.+?)\s+\d{8}\s+\d{4}\s+\d{4}\s+(UN|PC|PAR|CX|KG|MT|M2|LT|GL|PÇ|PEC)\s+([\d\.,]+)/i
-          );
-
-          if (mItem) {
-            const descricao  = mItem[1].trim();
-            const qtdStr     = mItem[3].replace(/\./g, "").replace(",", ".");
-            const quantidade = parseFloat(qtdStr);
-
-            if (!isNaN(quantidade) && quantidade > 0) {
-              resultado.itens.push({ descricao, quantidade: Math.round(quantidade) });
-            }
+        if (m4 && m4[2].trim().length > 3) {
+          descricaoEncontrada = m4[2].trim();
+          quantidadeEncontrada = parseFloat(m4[4].replace(/\./g, "").replace(",", "."));
+        } else {
+          // Padrão 1: Tenta QTD depois da Unidade (ex: UN 10,00)
+          const m1 = linha.match(/(.*)\b(UN|UNID|UND|PC|P[CÇ]S?|PAR|CX|KG|MT|M2|LT|GL|PR|CJ|PCT|KIT|JG)\b\s+([\d\.,]+)/i);
+          if (m1) {
+            descricaoEncontrada = m1[1].trim();
+            quantidadeEncontrada = parseFloat(m1[3].replace(/\./g, "").replace(",", "."));
           } else {
-            // Fallback: NCM pode ter formatação diferente; tenta capturar só por unidade + quantidade
-            const mFallback = restoLinha.match(
-              /^(.+?)\s+(?:UN|PC|PAR|CX|KG|MT|M2|LT|GL|PÇ|PEC)\s+([\d\.,]+)/i
-            );
-            if (mFallback) {
-              const descricao  = mFallback[1].trim();
-              const qtdStr     = mFallback[2].replace(/\./g, "").replace(",", ".");
-              const quantidade = parseFloat(qtdStr);
-              if (!isNaN(quantidade) && quantidade > 0) {
-                resultado.itens.push({ descricao, quantidade: Math.round(quantidade) });
+            // Padrão 2: Tenta QTD antes da Unidade (ex: 10,00 UN)
+            const m2 = linha.match(/(.*)\b([\d\.,]+)\s+\b(UN|UNID|UND|PC|P[CÇ]S?|PAR|CX|KG|MT|M2|LT|GL|PR|CJ|PCT|KIT|JG)\b/i);
+            if (m2) {
+              descricaoEncontrada = m2[1].trim();
+              quantidadeEncontrada = parseFloat(m2[2].replace(/\./g, "").replace(",", "."));
+            } else {
+              // Padrão 3: Sem sigla de unidade impressa
+              const m3 = linha.match(/(.*?)\b(\d{8})\b\s+(?:\d{2,4}\s+){1,2}([\d\.,]+)\s+[\d\.,]+\s+[\d\.,]+/);
+              if (m3) {
+                descricaoEncontrada = m3[1].trim();
+                quantidadeEncontrada = parseFloat(m3[3].replace(/\./g, "").replace(",", "."));
               }
             }
           }
         }
 
-        resultado.confidence.itens = resultado.itens.length > 0 ? "alta" : "nenhum";
-      } else {
-        // Bloco não encontrado — loga para diagnóstico
-        console.warn("[extrairDadosNotaFiscal] Bloco 'DADOS DO PRODUTO' não encontrado.");
-        console.warn("[extrairDadosNotaFiscal] Primeiros 1500 chars do PDF:\n", texto.slice(0, 1500));
-        resultado.confidence.itens = "nenhum";
+        if (descricaoEncontrada !== null && !isNaN(quantidadeEncontrada) && quantidadeEncontrada > 0) {
+          
+          // MÁGICA: Se a linha quebrou no meio da palavra, pesca o resto da linha de cima
+          if (!/[a-zA-Z]{3,}/.test(descricaoEncontrada) && linhaAnterior) {
+            descricaoEncontrada = linhaAnterior + " " + descricaoEncontrada;
+          }
+          
+          // Limpa NCMs, códigos soltos e lixo numérico que tenha ficado
+          const descricaoLimpa = descricaoEncontrada
+            .replace(/\b\d{4,15}\b/g, "")
+            .replace(/^[0-9]+/, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (descricaoLimpa.length > 3) {
+            resultado.itens.push({ descricao: descricaoLimpa, quantidade: Math.round(quantidadeEncontrada) });
+          }
+        }
+        
+        if (linha.trim().length > 0) {
+          linhaAnterior = linha;
+        }
       }
+
+      resultado.confidence.itens = resultado.itens.length > 0 ? "alta" : "nenhum";
+      
     } catch (e) {
       console.warn("[extrairDadosNotaFiscal] Erro ao extrair itens:", e.message);
     }

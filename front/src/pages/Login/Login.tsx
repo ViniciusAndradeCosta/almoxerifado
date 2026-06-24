@@ -162,12 +162,14 @@ const Login = () => {
             >
               {loading ? <span className="spinner-border spinner-border-sm" /> : "Entrar no Sistema"}
             </button>
-
           </form>
 
-          <div style={{ marginTop: "32px", textAlign: "center" }}>
+          <div style={{ marginTop: "32px", textAlign: "center", display: "flex", flexDirection: "column", gap: "6px" }}>
             <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: 0 }}>
               © 2026 Hiper. Todos os direitos reservados.
+            </p>
+            <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", margin: 0, opacity: 0.7 }}>
+              Desenvolvido por: <strong>Vinícius Andrade Costa</strong>
             </p>
           </div>
         </div>

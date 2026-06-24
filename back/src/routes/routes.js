@@ -15,6 +15,8 @@ import { createDiscard, getDiscarded, getDiscardedByItem, getDiscardReport, dele
 import { sendToLaundry, returnFromLaundry, getPending, getLaundryHistory, getLaundryRecord } from '../controllers/Item/LaundryController.js';
 import { uploadInvoiceMiddleware } from '../config/upload.js';
 import { uploadInvoice, getInvoices, downloadInvoice, deleteInvoice, extractInvoiceData } from '../controllers/Invoice/InvoiceController.js';
+import { downloadFichaColaborador, downloadFichaColaboradorPDF } from '../controllers/Employee/FichaController.js';
+import { processarEmailsDeNotasFiscais } from '../services/emailReaderService.js'
 
 
 
@@ -126,6 +128,10 @@ routes.post('/laundry/return/:id', returnFromLaundry);
 routes.get('/laundry/pending', getPending);
 routes.get('/laundry/all', getLaundryHistory);
 routes.get('/laundry/:id', getLaundryRecord);
+
+//ROTA DE DOWNLOAD DE FICHA DO COLABORADOR
+routes.get('/ficha/:id', downloadFichaColaborador);
+routes.get('/ficha/:id/pdf', downloadFichaColaboradorPDF);
 
 
 export default routes;

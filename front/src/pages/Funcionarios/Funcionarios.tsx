@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
-import { Link } from "react-router-dom";
 import api from "../../services/useApi";
 import Papa from "papaparse";
 import { Employee } from "../../types/Employee";
 import { formatDate } from "../../utils/dateFunctions";
+import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS } from "../../constants/uniformesPorSetor";
 import { company } from "./EmployeeTypes";
+import { Link, useLocation } from "react-router-dom";
 import {
   IconUsers, IconPlus, IconEdit, IconTrash, IconSearch,
   IconX, IconDownload, IconCheckCircle, IconArrowRight, IconPackage
@@ -27,6 +28,16 @@ interface EntregaItem {
   qty: number;
 }
 
+// Item do kit pré-carregado — aguarda tamanho do usuário para vincular ao estoque
+interface KitItemForm {
+  nomeKit: string;       // nome da planilha (ex: "CAMISA")
+  ca?: string;           // CA do EPI (se aplicável)
+  tipo: "uniforme" | "epi";
+  qtde: number;          // quantidade padrão do kit
+  tamanho: string;       // preenchido pelo usuário
+  itemVinculado: ItemEstoque | null;  // item encontrado no estoque com aquele nome+tamanho
+}
+
 const emptyForm = {
   name: "", company: "", role: "", department: "",
   admissionDate: "", shirt_size: "", pants_size: "", shoes_size: "",
@@ -37,7 +48,7 @@ const Funcionarios = () => {
   const [filtered, setFiltered]           = useState<Employee[]>([]);
   const [loading, setLoading]             = useState(true);
   const [roles, setRoles]                 = useState<string[]>([]);
-  const [departments, setDepartments]     = useState<string[]>([]);
+  // departments removido — departamento agora usa SETORES_DISPONIVEIS
   const [todosItems, setTodosItems]       = useState<ItemEstoque[]>([]);
 
   // Filtros lista
@@ -56,8 +67,9 @@ const Funcionarios = () => {
   // Primeira entrega — múltiplos itens
   const [primeiroItemSearch, setPrimeiroItemSearch]       = useState("");
   const [filteredPrimeiroItem, setFilteredPrimeiroItem]   = useState<ItemEstoque[]>([]);
-  const [primeiroItemQty, setPrimeiroItemQty]             = useState<number>(1);
+  // primeiroItemQty removido — quantidade vem do kit
   const [entregaItens, setEntregaItens]                   = useState<EntregaItem[]>([]);
+  const [kitItensForm, setKitItensForm]                   = useState<KitItemForm[]>([]);
   const [dropdownPos, setDropdownPos]                     = useState<{ top: number; left: number; width: number } | null>(null);
   const [highlightedIndex, setHighlightedIndex]           = useState<number>(-1);
   const primeiroItemInputRef                              = useRef<HTMLInputElement>(null);
@@ -84,6 +96,15 @@ const Funcionarios = () => {
     item?.scrollIntoView({ block: "nearest" });
   }, [highlightedIndex]);
 
+  // Abre modal de cadastro automaticamente se vier de ?novo=true
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      if (params.get("novo") === "true") {
+        setModo("cadastro");
+        setPanelOpen(true);
+      }
+    }, [location.search]);
+
   const fetchAll = async () => {
     try {
       setLoading(true);
@@ -94,7 +115,7 @@ const Funcionarios = () => {
       const data: Employee[] = empRes.data || [];
       setFuncionarios(data);
       setFiltered(data);
-      setDepartments([...new Set(data.map(e => (e.department || "").trim()).filter(Boolean))] as string[]);
+      // setDepartments não mais necessário
       setRoles([...new Set(data.map(e => (e.role || "").trim()).filter(Boolean))] as string[]);
       setTodosItems(itemsRes.data || []);
     } catch (e) { console.log(e); }
@@ -107,7 +128,7 @@ const Funcionarios = () => {
     setSelected(null);
     setEntregaItens([]);
     setPrimeiroItemSearch("");
-    setPrimeiroItemQty(1);
+    // qty resetada pelo kit
     setFilteredPrimeiroItem([]);
     setDropdownPos(null);
     setModo("cadastro");
@@ -147,14 +168,55 @@ const Funcionarios = () => {
     setPanelOpen(false);
     setSelected(null);
     setSaidas([]);
-    setEntregaItens([]);
+    setEntregaItens([]); setKitItensForm([]);
     setPrimeiroItemSearch("");
-    setPrimeiroItemQty(1);
+    // qty resetada pelo kit
     setFilteredPrimeiroItem([]);
     setDropdownPos(null);
   };
 
-  const setField = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const setField = (k: string, v: string) => {
+    setForm(f => ({ ...f, [k]: v }));
+
+    if (k === "department" && modo === "cadastro") {
+      if (v && UNIFORMES_POR_SETOR[v]) {
+        const kit = UNIFORMES_POR_SETOR[v];
+        const novosItens: KitItemForm[] = [
+          ...kit.uniformes.map(u => ({ nomeKit: u.nome, ca: undefined, tipo: "uniforme" as const, qtde: u.qtde, tamanho: "", itemVinculado: null })),
+          ...kit.epis.map(e => ({ nomeKit: e.nome, ca: e.ca, tipo: "epi" as const, qtde: e.qtde, tamanho: "", itemVinculado: null })),
+        ];
+        setKitItensForm(novosItens);
+        setEntregaItens([]); // limpa entrega anterior
+      } else {
+        setKitItensForm([]);
+        setEntregaItens([]);
+      }
+    }
+  };
+
+  // Atualiza o tamanho de um item do kit e vincula ao estoque se encontrar
+  const atualizarTamanhoKit = (idx: number, tamanho: string) => {
+    setKitItensForm(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const tam = tamanho.toUpperCase().trim();
+      // Busca exata: nome do item no estoque contém o nome do kit E o tamanho bate
+      const encontrado = tam
+        ? todosItems.find(est =>
+            est.name.toUpperCase().includes(item.nomeKit.toUpperCase()) &&
+            est.size?.toUpperCase().trim() === tam
+          ) || null
+        : null;
+      return { ...item, tamanho, itemVinculado: encontrado };
+    }));
+  };
+
+  // Sincroniza kitItensForm → entregaItens (apenas itens vinculados)
+  const sincronizarEntrega = () => {
+    const vinculados: EntregaItem[] = kitItensForm
+      .filter(k => k.itemVinculado !== null)
+      .map(k => ({ item: k.itemVinculado as ItemEstoque, qty: k.qtde }));
+    setEntregaItens(vinculados);
+  };
 
   // Busca primeira entrega — com cálculo de posição para portal
   const handlePrimeiroItemSearch = (val: string) => {
@@ -196,7 +258,7 @@ const Funcionarios = () => {
     });
 
     // Reseta qty para a próxima seleção
-    setPrimeiroItemQty(1);
+    // qty resetada pelo kit
   };
 
   const removerEntregaItem = (itemId: number) => {
@@ -451,40 +513,54 @@ const Funcionarios = () => {
       {/* ══════════════ PAINEL LATERAL ══════════════ */}
       {panelOpen && (
         <>
-          <div onClick={closePanel} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 99 }}/>
+          {/* Overlay */}
+          <div onClick={closePanel} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 99 }}/>
+
+          {/* Modal centralizado */}
           <div ref={panelRef} style={{
-            position: "fixed", top: 0, right: 0, bottom: 0, width: 440,
-            background: "var(--surface)", borderLeft: "1px solid var(--border)",
-            display: "flex", flexDirection: "column", zIndex: 100,
-            boxShadow: "-4px 0 20px rgba(0,0,0,0.15)",
+            position: "fixed",
+            top: "44%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "min(92vw, 1160px)",
+            maxHeight: "92vh",
+            marginLeft: "100px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            display: "flex", flexDirection: "column",
+            zIndex: 100,
+            boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
           }}>
 
-            {/* Header painel */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-subtle)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand)" }}>
-                  <IconUsers size={14}/>
+            {/* Header modal */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)", borderRadius: "12px 12px 0 0", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--brand-subtle)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand)" }}>
+                  <IconUsers size={15}/>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>
+                  <div style={{ fontWeight: 800, fontSize: "0.9rem" }}>
                     {modo === "cadastro" ? "Novo Funcionário" : modo === "edicao" ? "Editar Funcionário" : "Histórico de Saídas"}
                   </div>
                   {selected && modo !== "cadastro" && (
-                    <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: 1 }}>{selected.name}</div>
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 1 }}>{selected.name}</div>
                   )}
                 </div>
               </div>
               <button onClick={closePanel} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 4 }}>
-                <IconX size={16}/>
+                <IconX size={18}/>
               </button>
             </div>
 
-            {/* Corpo painel */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
+            {/* Corpo modal com scroll */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
 
               {/* ── CADASTRO / EDIÇÃO ── */}
               {(modo === "cadastro" || modo === "edicao") && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+
+                  {/* ── COLUNA ESQUERDA: dados + tamanhos ── */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
                   {/* Dados pessoais */}
                   <div style={card}>
@@ -499,9 +575,14 @@ const Funcionarios = () => {
                       <div style={fieldRow("1fr 1fr")}>
                         <div>
                           <label style={lbl}>Empresa</label>
-                          <select className="form-select" value={form.company} onChange={e => setField("company", e.target.value)}>
-                            <option value="">Selecione...</option>
-                            {company.map((c, i) => <option key={i} value={c.name}>{c.name}</option>)}
+                          <select className="form-select" value={form.company} onChange={e => setField("company", e.target.value)}
+                            style={{ fontSize: "0.82rem" }}>
+                            <option value="">Selecione a empresa...</option>
+                            {company.map((c, i) => (
+                              <option key={i} value={c.name}>
+                                {c.loja ? `${c.label} — ${c.loja}` : c.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -512,8 +593,26 @@ const Funcionarios = () => {
                       <div style={{ ...fieldRow("1fr 1fr"), marginBottom: 0 }}>
                         <div>
                           <label style={lbl}>Departamento</label>
-                          <input className="form-control" value={form.department} onChange={e => setField("department", e.target.value)} placeholder="Ex: LIMPEZA" list="dep-list" autoComplete="off"/>
-                          <datalist id="dep-list">{departments.map(d => <option key={d} value={d}/>)}</datalist>
+                          <select
+                            className="form-select"
+                            value={form.department}
+                            onChange={e => setField("department", e.target.value)}
+                          >
+                            <option value="">Selecione o departamento...</option>
+                            {SETORES_DISPONIVEIS.map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                            <option value="OUTRO">OUTRO (não listado)</option>
+                          </select>
+                          {form.department === "OUTRO" && (
+                            <input
+                              className="form-control"
+                              style={{ marginTop: 6 }}
+                              placeholder="Digite o departamento..."
+                              onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+                              autoComplete="off"
+                            />
+                          )}
                         </div>
                         <div>
                           <label style={lbl}>Cargo</label>
@@ -548,7 +647,12 @@ const Funcionarios = () => {
                     </div>
                   </div>
 
-                  {/* Primeira entrega — só no cadastro */}
+                  </div>
+
+                  {/* ── COLUNA DIREITA: kit + primeira entrega ── */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                  {/* Primeira entrega — kit pré-carregado + busca manual */}
                   {modo === "cadastro" && (
                     <div style={card}>
                       <div style={head}>
@@ -558,12 +662,84 @@ const Funcionarios = () => {
                       </div>
                       <div style={{ padding: "14px 16px" }}>
                         <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", margin: "0 0 12px" }}>
-                          Registre já na admissão os uniformes entregues ao colaborador.
+                          {kitItensForm.length > 0
+                            ? "Informe o tamanho de cada item do kit. Itens sem tamanho ou sem estoque não serão entregues."
+                            : "Registre já na admissão os uniformes entregues ao colaborador."}
                         </p>
 
-                        {/* Busca */}
+                        {/* Kit pré-carregado do setor */}
+                        {kitItensForm.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                            <label style={lbl}>Kit do setor — informe os tamanhos</label>
+                            {kitItensForm.map((kItem, idx) => {
+                              const temTamanho = kItem.tamanho.trim() !== "";
+                              const vinculado = kItem.itemVinculado;
+                              const semEstoque = temTamanho && !vinculado;
+                              const estoqueBaixo = vinculado && vinculado.quantity < kItem.qtde;
+                              return (
+                                <div key={idx} style={{
+                                  display: "grid", gridTemplateColumns: "1fr 80px 56px auto",
+                                  gap: 8, alignItems: "center",
+                                  padding: "8px 10px",
+                                  border: `1px solid ${semEstoque ? "var(--danger)" : vinculado ? "var(--success)" : "var(--border)"}`,
+                                  borderRadius: 6,
+                                  background: semEstoque ? "var(--danger-subtle, #fff0f0)" : vinculado ? "var(--success-subtle, #f0fff4)" : "var(--surface-2)",
+                                }}>
+                                  {/* Nome + status */}
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {kItem.nomeKit}
+                                      {kItem.ca && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "var(--text-muted)", fontWeight: 400 }}>CA {kItem.ca}</span>}
+                                    </div>
+                                    <div style={{ fontSize: "0.65rem", marginTop: 2 }}>
+                                      {semEstoque && <span style={{ color: "var(--danger)", fontWeight: 600 }}>❌ Não encontrado no estoque com este tamanho</span>}
+                                      {vinculado && !estoqueBaixo && <span style={{ color: "var(--success)", fontWeight: 600 }}>✓ {vinculado.quantity} em estoque</span>}
+                                      {vinculado && estoqueBaixo && <span style={{ color: "var(--warning)", fontWeight: 600 }}>⚠ Apenas {vinculado.quantity} disponível</span>}
+                                      {!temTamanho && <span style={{ color: "var(--text-muted)" }}>Digite o tamanho →</span>}
+                                    </div>
+                                  </div>
+                                  {/* Tamanho — editável */}
+                                  <input
+                                    className="form-control"
+                                    value={kItem.tamanho}
+                                    onChange={e => atualizarTamanhoKit(idx, e.target.value)}
+                                    onBlur={sincronizarEntrega}
+                                    placeholder="Ex: G, 42"
+                                    style={{ textAlign: "center", fontWeight: 700, fontSize: "0.78rem", padding: "4px 6px" }}
+                                  />
+                                  {/* Quantidade — fixada pelo kit, somente leitura */}
+                                  <div style={{
+                                    textAlign: "center", fontFamily: "'JetBrains Mono', monospace",
+                                    fontWeight: 800, fontSize: "0.82rem",
+                                    padding: "4px 6px", borderRadius: 5,
+                                    background: "var(--surface)", border: "1px solid var(--border)",
+                                    color: "var(--text-primary)",
+                                  }}>
+                                    ×{kItem.qtde}
+                                  </div>
+                                  {/* Remover */}
+                                  <button
+                                    onClick={() => { setKitItensForm(prev => prev.filter((_, i) => i !== idx)); sincronizarEntrega(); }}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 2 }}
+                                  >
+                                    <IconX size={13}/>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={sincronizarEntrega}
+                              style={{ alignSelf: "flex-end", padding: "5px 14px", borderRadius: 6, border: "none", background: "var(--brand)", color: "#fff", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Atualizar Entrega
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Busca manual para adicionar itens extras */}
                         <div style={{ marginBottom: 14 }}>
-                          <label style={lbl}>Item</label>
+                          <label style={lbl}>Adicionar item extra</label>
                           <div style={{ position: "relative" }}>
                             <input
                               ref={primeiroItemInputRef}
@@ -599,7 +775,7 @@ const Funcionarios = () => {
                           </div>
                         </div>
 
-                        {/* Lista de itens adicionados */}
+                        {/* Lista de itens adicionados manualmente + sincronizados do kit */}
                         {entregaItens.length > 0 && (
                           <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 6 }}>
                             <label style={lbl}>Itens a entregar ({entregaItens.length})</label>
@@ -615,7 +791,10 @@ const Funcionarios = () => {
                                 }}
                               >
                                 <span style={{ flex: 1, fontSize: "0.76rem", fontWeight: 600, color: "var(--text)" }}>
-                                  {item.name}
+                                  {item.name}{item.size ? ` (${item.size})` : ""}
+                                </span>
+                                <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", flexShrink: 0 }}>
+                                  Disp: {item.quantity}
                                 </span>
                                 <input
                                   type="number"
@@ -647,6 +826,7 @@ const Funcionarios = () => {
                     </div>
                   )}
 
+                  </div>
                 </div>
               )}
 
@@ -686,9 +866,9 @@ const Funcionarios = () => {
               )}
             </div>
 
-            {/* Footer painel */}
+            {/* Footer modal */}
             {(modo === "cadastro" || modo === "edicao") && (
-              <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0 }}>
+              <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0, background: "var(--surface-2)", borderRadius: "0 0 12px 12px" }}>
                 <button onClick={closePanel} style={{ padding: "8px 18px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer" }}>
                   Cancelar
                 </button>

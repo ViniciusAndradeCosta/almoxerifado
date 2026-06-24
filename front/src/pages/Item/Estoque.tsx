@@ -69,8 +69,11 @@ const Estoque = () => {
 
   const handleCreateItem = async () => {
     if (!itemName.trim()) { window.alert("Informe o nome do item."); return; }
-    const exists = estoque.find(i => i.name === itemName);
-    if (exists) { window.alert("Item já cadastrado!"); return; }
+    const exists = estoque.find(i =>
+      i.name === itemName &&
+      (i.size || "").toUpperCase().trim() === (itemSize || "").toUpperCase().trim()
+    );
+    if (exists) { window.alert("Item já cadastrado com esse nome e tamanho!"); return; }
     try {
       await api.post("/item", { name: itemName, quantity: itemQuantity, type: itemType, sector: itemSector, ean: itemEan, size: itemSize });
       setItemName(""); setItemQuantity(0); setItemType(""); setItemSector(""); setItemEan(""); setItemSize("");

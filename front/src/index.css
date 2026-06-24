@@ -119,16 +119,16 @@ body {
 /* ===== LAYOUT ===== */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-main {
   flex: 1;
-  /* Garante que o conteúdo ocupe o espaço restante */
   padding: 24px 28px;
-  min-height: 100vh;
+  overflow-y: auto;
+  height: 100vh;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  /* Removemos o margin-left fixo para o layout flex resolver o espaçamento */
   width: 100%;
 }
 

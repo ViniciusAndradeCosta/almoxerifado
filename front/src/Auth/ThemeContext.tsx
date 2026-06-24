@@ -21,7 +21,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   });
 
   useEffect(() => {
+    // Aplica no sistema de CSS customizado (var(--bg), etc.)
     document.documentElement.setAttribute("data-theme", theme);
+    // Aplica no Bootstrap (tabelas, dropdowns, etc.)
+    document.documentElement.setAttribute("data-bs-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 

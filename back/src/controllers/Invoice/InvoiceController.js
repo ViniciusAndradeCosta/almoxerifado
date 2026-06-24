@@ -11,20 +11,32 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// Busca o item no banco cujo nome esteja CONTIDO na descrição extraída da NF.
-// O Prisma só faz "banco contains NF", mas o correto é "NF contains banco".
-// Por isso carregamos todos os itens e filtramos em JS.
-// Ex: banco tem "BLUSA DE MOLETOM", NF tem "BLUSA DE MOLETOM" → match.
-//     banco tem "BLUSA DE MOLETOM", NF tem "BLUSA DE MOLETOM CINZA M" → match.
-async function buscarItemNoBanco(descricaoNF) {
-  const todosItens = await prisma.item.findMany({ select: { id: true, name: true } });
-  const descricaoUpper = descricaoNF.toUpperCase();
-  return todosItens.find(item => descricaoUpper.includes(item.name.toUpperCase())) || null;
+// ── Normalizador Inteligente ──
+// Remove acentos, pontuações, espaços duplos e deixa tudo maiúsculo.
+function normalizarTexto(texto) {
+  if (!texto) return '';
+  return String(texto)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Tira acentos
+    .replace(/[^a-zA-Z0-9\s]/g, "")  // Tira pontuações e caracteres especiais
+    .toUpperCase()
+    .replace(/\s+/g, " ")            // Tira espaços duplos
+    .trim();
 }
 
-// POST /invoices/upload — recebe o arquivo via multer (req.file) + metadados.
-// Se for PDF, tenta extrair automaticamente fornecedor/número/data/itens;
-// os campos enviados manualmente pelo usuário sempre têm prioridade.
+// ── Busca de Item Flexível ──
+async function buscarItemNoBanco(descricaoNF) {
+  const todosItens = await prisma.item.findMany({ select: { id: true, name: true } });
+  const descNF = normalizarTexto(descricaoNF);
+
+  return todosItens.find(item => {
+    const nomeBanco = normalizarTexto(item.name);
+    // Verifica se a Nota tem o nome do Banco, OU se o Banco tem o nome da Nota
+    return descNF.includes(nomeBanco) || nomeBanco.includes(descNF);
+  }) || null;
+}
+
+// POST /invoices/upload
 export async function uploadInvoice(req, res) {
   try {
     if (!req.file) {
@@ -34,13 +46,11 @@ export async function uploadInvoice(req, res) {
     const { supplier, invoiceNumber, invoiceDate, notes, stockEntryId } = req.body;
     const filePath = path.join(UPLOAD_DIR, req.file.filename);
 
-    // Extração automática apenas para PDFs
     let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [], confidence: {} };
     if (req.file.mimetype === "application/pdf") {
       extraido = await extrairDadosNotaFiscal(filePath);
     }
 
-    // Campos enviados pelo usuário têm prioridade; senão usa o que foi extraído
     const fornecedorFinal = (supplier && supplier.trim()) || extraido.supplier || null;
     const numeroFinal     = (invoiceNumber && invoiceNumber.trim()) || extraido.invoiceNumber || null;
     const dataFinal       = invoiceDate ? new Date(invoiceDate) : (extraido.invoiceDate ? new Date(extraido.invoiceDate) : null);
@@ -59,13 +69,11 @@ export async function uploadInvoice(req, res) {
       },
     });
 
-    // ── Entrada automática no estoque pelos itens extraídos da NF ──
     const entradasRealizadas = [];
     const entradasIgnoradas  = [];
 
     if (extraido.itens && extraido.itens.length > 0) {
       for (const itemNF of extraido.itens) {
-        // CORRIGIDO: busca se a descrição da NF contém o nome do item do banco
         const itemBanco = await buscarItemNoBanco(itemNF.descricao);
 
         if (itemBanco) {
@@ -105,6 +113,7 @@ export async function uploadInvoice(req, res) {
         invoiceDate:   extraido.invoiceDate,
         confidence:    extraido.confidence,
         itens:         extraido.itens || [],
+        textoCompleto: extraido.textoCompleto,
         usouExtracao: {
           supplier:      !supplier      && !!extraido.supplier,
           invoiceNumber: !invoiceNumber && !!extraido.invoiceNumber,
@@ -126,8 +135,7 @@ export async function uploadInvoice(req, res) {
   }
 }
 
-// POST /invoices/extract — apenas extrai os dados SEM salvar, para o frontend
-// pré-preencher o formulário antes do usuário confirmar o upload.
+// POST /invoices/extract
 export async function extractInvoiceData(req, res) {
   try {
     if (!req.file) {
@@ -141,7 +149,6 @@ export async function extractInvoiceData(req, res) {
       extraido = await extrairDadosNotaFiscal(filePath);
     }
 
-    // Remove o arquivo temporário — esse endpoint é só para pré-visualização
     fs.unlinkSync(filePath);
 
     return res.json({
@@ -151,6 +158,7 @@ export async function extractInvoiceData(req, res) {
       invoiceDate:   extraido.invoiceDate,
       itens:         extraido.itens || [],
       confidence:    extraido.confidence,
+      textoCompleto: extraido.textoCompleto
     });
   } catch (error) {
     if (req.file) {
@@ -161,7 +169,7 @@ export async function extractInvoiceData(req, res) {
   }
 }
 
-// GET /invoices — lista todas as notas fiscais (mais recentes primeiro)
+// GET /invoices
 export async function getInvoices(req, res) {
   try {
     const invoices = await prisma.invoice.findMany({
@@ -174,7 +182,7 @@ export async function getInvoices(req, res) {
   }
 }
 
-// GET /invoices/:id/download — baixa o arquivo da nota fiscal
+// GET /invoices/:id/download
 export async function downloadInvoice(req, res) {
   try {
     const invoice = await prisma.invoice.findUnique({ where: { id: parseInt(req.params.id) } });
@@ -189,7 +197,7 @@ export async function downloadInvoice(req, res) {
   }
 }
 
-// DELETE /invoices/:id — remove a nota fiscal (banco + arquivo físico)
+// DELETE /invoices/:id
 export async function deleteInvoice(req, res) {
   try {
     const invoice = await prisma.invoice.findUnique({ where: { id: parseInt(req.params.id) } });

@@ -227,7 +227,11 @@ const EntradaEstoque = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {[...entries].sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()).map(entry => (
+                                {[...entries].sort((a, b) => {
+                                    const da = a.entryDate ? a.entryDate.substring(0, 19) : "";
+                                    const db = b.entryDate ? b.entryDate.substring(0, 19) : "";
+                                    return db.localeCompare(da);
+                                }).map(entry => (
                                     <tr key={entry.id}>
                                         <td style={{ fontWeight: 600, fontSize: "0.8rem" }}>{entry.item?.name || "—"}</td>
                                         <td style={{ fontSize: "0.76rem", color: "var(--brand)", fontWeight: 700 }}>{entry.item?.size || "—"}</td>

@@ -139,6 +139,30 @@ const SaidaItens = () => {
     } catch (e) { window.alert("Erro ao baixar ficha."); }
   };
 
+
+  const handleDownloadHistorico = async () => {
+    try {
+      const res = await api.get(`/ficha/${id}`, {
+        responseType: "blob",
+        headers: { username: localStorage.getItem("name") || "" },
+      });
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(new Blob([res.data]));
+      a.download = `Historico_${funcionario?.name?.replace(/\s+/g, "_")}.xlsx`;
+      a.click();
+    } catch (e) { window.alert("Erro ao baixar histórico."); }
+  };
+
+  const handleDownloadHistoricoPDF = async () => {
+    try {
+      const res = await api.get(`/ficha/${id}/pdf`, { responseType: "blob" });
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      a.download = `Historico_${funcionario?.name?.replace(/\s+/g, "_")}.pdf`;
+      a.click();
+    } catch (e) { window.alert("Erro ao baixar PDF."); }
+  };
+  
   const handleSalvarUniforme = async () => {
     try {
       setSavingUniforme(true);
@@ -199,6 +223,12 @@ const SaidaItens = () => {
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={handleDownloadFicha} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--text-secondary)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
             <IconDownload size={13}/> Baixar Ficha
+          </button>
+          <button onClick={handleDownloadHistorico} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:"var(--brand)", border:"none", borderRadius:7, color:"#fff", fontSize:"0.75rem", fontWeight:600, cursor:"pointer" }}>
+            <IconDownload size={13}/> Histórico Excel
+          </button>
+          <button onClick={handleDownloadHistoricoPDF} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", background:"#1A5276", border:"none", borderRadius:7, color:"#fff", fontSize:"0.75rem", fontWeight:600, cursor:"pointer" }}>
+            <IconDownload size={13}/> Histórico PDF
           </button>
         </div>
       </div>

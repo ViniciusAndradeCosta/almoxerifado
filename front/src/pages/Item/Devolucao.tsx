@@ -45,11 +45,28 @@ const Devolucao = () => {
   // Auto-seleciona funcionário vindo da URL (ex: ficha do funcionário)
   useEffect(() => {
     const empIdUrl = searchParams.get("empId");
+    const saidaIdUrl = searchParams.get("saidaId");
     if (empIdUrl && employees.length > 0 && !selectedEmp) {
       const emp = employees.find(e => e.id === Number(empIdUrl));
-      if (emp) selectEmp(emp);
+      // Se tem saidaId, mantém a URL para o próximo useEffect processar
+      if (emp) selectEmp(emp, !!saidaIdUrl);
     }
   }, [employees, searchParams]);
+
+  // Auto-seleciona o item específico quando as saídas carregarem e houver saidaId na URL
+  useEffect(() => {
+    const saidaIdUrl = searchParams.get("saidaId");
+    if (!saidaIdUrl || saidas.length === 0 || itemSelecionado) return;
+
+    const saida = saidas.find(s => s.id === Number(saidaIdUrl));
+    if (saida) {
+      selecionarItem(saida);
+      // Limpa a URL após selecionar
+      searchParams.delete("empId");
+      searchParams.delete("saidaId");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [saidas, searchParams]);
 
   const fetchEmployees = async () => {
     try { const res = await api.get("/getemployees"); setEmployees(res.data); }
@@ -80,13 +97,16 @@ const Devolucao = () => {
     setFilteredEmps(val.length > 0 ? employees.filter(e => e.name.toLowerCase().includes(val.toLowerCase()) || e.department.toLowerCase().includes(val.toLowerCase())).slice(0, 6) : []);
   };
 
-  const selectEmp = (emp: Employee) => {
+  const selectEmp = (emp: Employee, manterUrl = false) => {
     setSelectedEmp(emp); setEmpSearch(emp.name);
     setFilteredEmps([]); setHighlightedIdx(-1);
     setItemSelecionado(null);
     fetchSaidasFuncionario(emp.id);
-    // Limpa params da URL
-    searchParams.delete("empId"); setSearchParams(searchParams, { replace: true });
+    // Só limpa a URL se não precisar manter o saidaId para auto-seleção
+    if (!manterUrl) {
+      searchParams.delete("empId");
+      setSearchParams(searchParams, { replace: true });
+    }
   };
 
   const clearEmp = () => { setSelectedEmp(null); setEmpSearch(""); setSaidas([]); setItemSelecionado(null); };
