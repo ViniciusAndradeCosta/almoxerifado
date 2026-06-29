@@ -1,24 +1,9 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import crypto from "crypto";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = path.join(__dirname, "../../uploads/invoices");
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const nomeUnico = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
-    cb(null, nomeUnico);
-  },
-});
+// Armazenamento em memória: o arquivo chega como buffer (req.file.buffer) e é
+// repassado ao provider de armazenamento (local ou SharePoint). Isso desacopla
+// o upload do filesystem e funciona em hospedagens com disco efêmero.
+const storage = multer.memoryStorage();
 
 const TIPOS_PERMITIDOS = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"];
 

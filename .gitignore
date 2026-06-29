@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Variáveis de ambiente (NUNCA versionar segredos)
+.env
+*.env
+!*.env.example
+
+# Build
+dist/
+dist-ssr/
+
+# Uploads locais (notas fiscais — armazenamento efêmero/dev)
+uploads/
+
+# Dados reais exportados (contêm informações de colaboradores/estoque)
+# Mantidos fora do versionamento por privacidade. Use-os apenas localmente
+# para importação inicial. Já versionados? rode: git rm --cached <arquivo>
+*.csv
+*.xlsx
+
+# Logs e SO
+*.log
+.DS_Store

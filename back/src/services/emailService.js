@@ -1,17 +1,4 @@
-import nodemailer from 'nodemailer';
-
-// ── Cria transporter SMTP (Gmail) ──
-function criarTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-}
+import { criarTransporter } from '../config/email.js';
 
 // ── Envia e-mail de confirmação de pedido ──
 export async function enviarEmailPedido(pedido, destinatario) {

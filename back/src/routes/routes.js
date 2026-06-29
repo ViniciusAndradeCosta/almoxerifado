@@ -16,7 +16,8 @@ import { sendToLaundry, returnFromLaundry, getPending, getLaundryHistory, getLau
 import { uploadInvoiceMiddleware } from '../config/upload.js';
 import { uploadInvoice, getInvoices, downloadInvoice, deleteInvoice, extractInvoiceData } from '../controllers/Invoice/InvoiceController.js';
 import { downloadFichaColaborador, downloadFichaColaboradorPDF } from '../controllers/Employee/FichaController.js';
-import { processarEmailsDeNotasFiscais } from '../services/emailReaderService.js'
+import { requireAuth, requireAdmin } from '../middlewares/auth.js';
+import rateLimit from 'express-rate-limit';
 
 
 
@@ -26,7 +27,21 @@ async function status(req, res) {
     res.send('API is running');
 }
 
+// Limita tentativas de login para mitigar ataques de força bruta.
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 20,                  // até 20 tentativas por IP na janela
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas tentativas de login. Tente novamente mais tarde.' },
+});
+
+// ===== ROTAS PÚBLICAS (sem autenticação) =====
 routes.get('/', status);
+routes.post('/login', loginLimiter, login);
+
+// ===== A PARTIR DAQUI, TODAS AS ROTAS EXIGEM TOKEN JWT VÁLIDO =====
+routes.use(requireAuth);
 
 routes.post('/cabinet', createCabinet);
 routes.get('/getcabinets', getCabinets);
@@ -53,12 +68,12 @@ routes.get('/countcompany/:company', getEmployeeCountByCompany);
 routes.get('/getemployees/new', getEmployeesStartingToday);
 routes.get('/downloadnewemployee/:id', downloadNewEmployee);
 
-routes.post('/user', createUser);
-routes.get('/user/:id', getUser);
-routes.put('/user/:id', updateUser);
-routes.delete('/user/:id', deleteUser);
-routes.get('/getusers', getUsers);
-routes.post('/login', login);
+// Gestão de usuários — restrita a administradores.
+routes.post('/user', requireAdmin, createUser);
+routes.get('/user/:id', requireAdmin, getUser);
+routes.put('/user/:id', requireAdmin, updateUser);
+routes.delete('/user/:id', requireAdmin, deleteUser);
+routes.get('/getusers', requireAdmin, getUsers);
 
 routes.post('/giveitem', giveItem);
 routes.get('/getwithdrawals', getWithdrawals);

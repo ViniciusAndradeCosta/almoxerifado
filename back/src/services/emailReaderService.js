@@ -1,21 +1,13 @@
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import prisma from '../database/client.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { extrairDadosNotaFiscal } from './invoiceExtractorService.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = path.join(__dirname, '../../uploads/invoices');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+import { getImapConfig } from '../config/email.js';
+import { getStorageProvider } from './storage/index.js';
 
 function criarClienteImap(tag) {
   const client = new ImapFlow({
-    host: 'imap.gmail.com',
-    port: 993,
-    secure: true,
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    ...getImapConfig(),
     logger: false,
   });
   client.on('error', err => console.error(`[${tag}] Aviso de rede no IMAP:`, err.message));
@@ -111,23 +103,30 @@ export async function processarEmailsDeNotasFiscais() {
           }
 
           for (const anexo of anexosPDF) {
-            const nomeUnico = `email-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`;
-            const caminhoArquivo = path.join(UPLOAD_DIR, nomeUnico);
-            fs.writeFileSync(caminhoArquivo, anexo.content);
+            const nomeOriginal = anexo.filename || `nota-fiscal-email-${Date.now()}.pdf`;
 
             let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [] };
             try {
-              extraido = await extrairDadosNotaFiscal(caminhoArquivo);
+              extraido = await extrairDadosNotaFiscal(anexo.content);
             } catch (e) {
               console.error('[E-mail Reader NF] Falha na extração do PDF:', e.message);
             }
 
             const fornecedor = extraido.supplier || parsed.from?.value?.[0]?.name || null;
 
+            // Salva o anexo no provider de armazenamento (local ou SharePoint).
+            const storage = getStorageProvider();
+            const { storageKey, provider } = await storage.save({
+              buffer: anexo.content,
+              originalName: nomeOriginal,
+              mimeType: 'application/pdf',
+            });
+
             await prisma.invoice.create({
               data: {
-                fileName: anexo.filename || `nota-fiscal-email-${Date.now()}.pdf`,
-                filePath: nomeUnico,
+                fileName: nomeOriginal,
+                filePath: storageKey,
+                storageProvider: provider,
                 fileType: 'application/pdf',
                 fileSize: anexo.content.length,
                 supplier: fornecedor,

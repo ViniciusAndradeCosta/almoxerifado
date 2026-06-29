@@ -32,9 +32,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
         const login = localStorage.getItem('login');
 
-        if (login) {
+        // Só considera autenticado se houver token salvo.
+        if (token && login) {
             const name = localStorage.getItem('name') || '';
             const role = localStorage.getItem('role') || '';
             setUser({ login, name, role });
@@ -47,11 +49,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const login = async (login: string, password: string) => {
         try {
             const response = await api.post('/login', { login, password });
+            // O backend agora retorna { token, user }.
+            const { token, user } = response.data;
             const userData: User = {
-                login: response.data.login,
-                name: response.data.name,
-                role: response.data.role
+                login: user.login,
+                name: user.name,
+                role: user.role
             };
+            localStorage.setItem('token', token);
             localStorage.setItem('login', userData.login);
             localStorage.setItem('name', userData.name);
             localStorage.setItem('role', userData.role);
@@ -65,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const logout = () => {
+        localStorage.removeItem('token');
         localStorage.removeItem('login');
         localStorage.removeItem('name');
         localStorage.removeItem('role');

@@ -1,15 +1,6 @@
 import prisma from "../../database/client.js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { extrairDadosNotaFiscal } from "../../services/invoiceExtractorService.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = path.join(__dirname, "../../../uploads/invoices");
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+import { getStorageProvider, getProviderByName } from "../../services/storage/index.js";
 
 // ── Normalizador Inteligente ──
 // Remove acentos, pontuações, espaços duplos e deixa tudo maiúsculo.
@@ -17,7 +8,7 @@ function normalizarTexto(texto) {
   if (!texto) return '';
   return String(texto)
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Tira acentos
+    .replace(/\p{Mn}/gu, "") // Tira acentos (marcas combinantes)
     .replace(/[^a-zA-Z0-9\s]/g, "")  // Tira pontuações e caracteres especiais
     .toUpperCase()
     .replace(/\s+/g, " ")            // Tira espaços duplos
@@ -38,27 +29,40 @@ async function buscarItemNoBanco(descricaoNF) {
 
 // POST /invoices/upload
 export async function uploadInvoice(req, res) {
+  let savedKey = null;
+  let savedProvider = null;
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: "Nenhum arquivo enviado." });
     }
 
     const { supplier, invoiceNumber, invoiceDate, notes, stockEntryId } = req.body;
-    const filePath = path.join(UPLOAD_DIR, req.file.filename);
 
+    // Extrai dados diretamente do buffer (sem tocar no disco).
     let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [], confidence: {} };
     if (req.file.mimetype === "application/pdf") {
-      extraido = await extrairDadosNotaFiscal(filePath);
+      extraido = await extrairDadosNotaFiscal(req.file.buffer);
     }
 
     const fornecedorFinal = (supplier && supplier.trim()) || extraido.supplier || null;
     const numeroFinal     = (invoiceNumber && invoiceNumber.trim()) || extraido.invoiceNumber || null;
     const dataFinal       = invoiceDate ? new Date(invoiceDate) : (extraido.invoiceDate ? new Date(extraido.invoiceDate) : null);
 
+    // Salva o arquivo no provider configurado (local ou SharePoint).
+    const storage = getStorageProvider();
+    const { storageKey, provider } = await storage.save({
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+    });
+    savedKey = storageKey;
+    savedProvider = provider;
+
     const invoice = await prisma.invoice.create({
       data: {
         fileName: req.file.originalname,
-        filePath: req.file.filename,
+        filePath: storageKey,
+        storageProvider: provider,
         fileType: req.file.mimetype,
         fileSize: req.file.size,
         supplier: fornecedorFinal,
@@ -127,9 +131,9 @@ export async function uploadInvoice(req, res) {
       },
     });
   } catch (error) {
-    if (req.file) {
-      const filePath = path.join(UPLOAD_DIR, req.file.filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Se o arquivo já foi salvo mas algo falhou depois, remove para não deixar lixo.
+    if (savedKey) {
+      try { await getProviderByName(savedProvider).delete(savedKey); } catch { /* ignora */ }
     }
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -142,14 +146,11 @@ export async function extractInvoiceData(req, res) {
       return res.status(400).json({ success: false, error: "Nenhum arquivo enviado." });
     }
 
-    const filePath = path.join(UPLOAD_DIR, req.file.filename);
-
+    // Apenas extrai os dados do buffer; nada é persistido.
     let extraido = { supplier: null, invoiceNumber: null, invoiceDate: null, itens: [], confidence: {} };
     if (req.file.mimetype === "application/pdf") {
-      extraido = await extrairDadosNotaFiscal(filePath);
+      extraido = await extrairDadosNotaFiscal(req.file.buffer);
     }
-
-    fs.unlinkSync(filePath);
 
     return res.json({
       success:       true,
@@ -161,10 +162,6 @@ export async function extractInvoiceData(req, res) {
       textoCompleto: extraido.textoCompleto
     });
   } catch (error) {
-    if (req.file) {
-      const filePath = path.join(UPLOAD_DIR, req.file.filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -188,10 +185,13 @@ export async function downloadInvoice(req, res) {
     const invoice = await prisma.invoice.findUnique({ where: { id: parseInt(req.params.id) } });
     if (!invoice) return res.status(404).json({ error: "Nota fiscal não encontrada." });
 
-    const filePath = path.join(UPLOAD_DIR, invoice.filePath);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Arquivo não encontrado no servidor." });
+    const provider = getProviderByName(invoice.storageProvider);
+    const buffer = await provider.getBuffer(invoice.filePath);
+    if (!buffer) return res.status(404).json({ error: "Arquivo não encontrado no armazenamento." });
 
-    res.download(filePath, invoice.fileName);
+    res.set("Content-Type", invoice.fileType || "application/octet-stream");
+    res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(invoice.fileName)}"`);
+    return res.send(buffer);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -203,8 +203,11 @@ export async function deleteInvoice(req, res) {
     const invoice = await prisma.invoice.findUnique({ where: { id: parseInt(req.params.id) } });
     if (!invoice) return res.status(404).json({ error: "Nota fiscal não encontrada." });
 
-    const filePath = path.join(UPLOAD_DIR, invoice.filePath);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    try {
+      await getProviderByName(invoice.storageProvider).delete(invoice.filePath);
+    } catch (e) {
+      console.warn(`[Invoice] Falha ao remover arquivo do armazenamento: ${e.message}`);
+    }
 
     await prisma.invoice.delete({ where: { id: parseInt(req.params.id) } });
 

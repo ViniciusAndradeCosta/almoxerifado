@@ -2,7 +2,8 @@ import fs from "fs";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 // Extrai fornecedor, número da NF, data de emissão e itens de um PDF de DANFE/NF-e.
-export async function extrairDadosNotaFiscal(filePath) {
+// Aceita tanto um caminho de arquivo (string) quanto um Buffer com o conteúdo do PDF.
+export async function extrairDadosNotaFiscal(entrada) {
   const resultado = {
     supplier: null,
     invoiceNumber: null,
@@ -12,7 +13,7 @@ export async function extrairDadosNotaFiscal(filePath) {
   };
 
   try {
-    const dataBuffer = fs.readFileSync(filePath);
+    const dataBuffer = Buffer.isBuffer(entrada) ? entrada : fs.readFileSync(entrada);
     const pdfData = await pdfParse(dataBuffer);
     const texto = pdfData.text;
 

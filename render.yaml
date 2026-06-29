@@ -1,0 +1,62 @@
+# ============================================================================
+# Blueprint do Render para o BACKEND (Node/Express/Prisma).
+# Render lê este arquivo na raiz do repositório. O frontend vai na Vercel.
+#
+# Uso: no Render, "New +" > "Blueprint" e selecione este repositório.
+# Depois preencha as variáveis marcadas com sync:false no painel.
+# ============================================================================
+services:
+  - type: web
+    name: almoxarifado-api
+    runtime: node
+    rootDir: back
+    plan: free
+    branch: main
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Banco (Neon) — cole as strings no painel (não versionar segredos).
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Autenticação — Render gera um segredo forte automaticamente.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES
+        value: 8h
+      # CORS — URL pública do frontend na Vercel.
+      - key: CORS_ORIGIN
+        sync: false
+      # Armazenamento de notas fiscais (use "sharepoint" quando configurado).
+      - key: STORAGE_PROVIDER
+        value: sharepoint
+      # Jobs de e-mail (ative só quando as credenciais Outlook estiverem prontas).
+      - key: ENABLE_EMAIL_JOBS
+        value: "false"
+      - key: EMAIL_PROVIDER
+        value: outlook
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_DESTINATARIO
+        sync: false
+      - key: EMAIL_PEDIDOS_DEST
+        sync: false
+      # SharePoint (Microsoft Graph) — preencher quando a empresa liberar.
+      - key: SHAREPOINT_TENANT_ID
+        sync: false
+      - key: SHAREPOINT_CLIENT_ID
+        sync: false
+      - key: SHAREPOINT_CLIENT_SECRET
+        sync: false
+      - key: SHAREPOINT_SITE_ID
+        sync: false
+      - key: SHAREPOINT_DRIVE_ID
+        sync: false
+      - key: SHAREPOINT_FOLDER
+        value: NotasFiscais

@@ -6,8 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Conexão direta usada para migrações (recomendado com pooling do Neon/PgBouncer).
+  // Se não usar pooling, aponte DIRECT_URL para a mesma string de DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -153,7 +156,8 @@ model LaundryRecord {
 model Invoice {
   id            Int      @id @default(autoincrement())
   fileName      String   // Nome original do arquivo
-  filePath      String   // Caminho no servidor
+  filePath      String   // Chave de armazenamento (storageKey) no provider escolhido
+  storageProvider String @default("local") // Provider onde o arquivo está: "local" ou "sharepoint"
   fileType      String   // mime type (pdf, jpg, png)
   fileSize      Int      // tamanho em bytes
   supplier      String?  // fornecedor

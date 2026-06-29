@@ -1,6 +1,6 @@
 import { buscarAlertas } from "../services/alertService.js";
 import { enviarEmailAlerta } from "../services/emailService.js";
-import nodemailer from "nodemailer";
+import { criarTransporter } from "../config/email.js";
 import prisma from "../database/client.js";
 
 const HORARIO_RESUMO = 8;
@@ -21,13 +21,7 @@ function getSemanaISO(data) {
   return `${d.getUTCFullYear()}-W${semana}`;
 }
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const transporter = criarTransporter();
 
 function getAlertasComoMapa(alertas) {
   const mapa = {};
