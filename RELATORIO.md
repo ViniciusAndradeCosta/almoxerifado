@@ -108,14 +108,14 @@ SHAREPOINT_DRIVE_ID=...
 SHAREPOINT_FOLDER=NotasFiscais
 ```
 
-### c) Implementar as chamadas reais (já mapeadas no código)
-No arquivo `sharepointProvider.js`, há blocos comentados marcados com **`[GRAPH]`** indicando exatamente onde entram as chamadas ao Microsoft Graph:
-- **Autenticação** (`getAccessToken`): client credentials em `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`.
+### c) Implementação real (JÁ ESCRITA — só falta ativar)
+O `sharepointProvider.js` já contém o código real do Microsoft Graph, com **fallback automático para o mock** enquanto as credenciais não existirem:
+- **Autenticação** (`getAccessToken`): client credentials em `login.microsoftonline.com/{tenant}/oauth2/v2.0/token` (com cache de token).
 - **Upload** (`save`): `PUT /drives/{driveId}/root:/{folder}/{nome}:/content`.
 - **Download** (`getBuffer`): `GET /drives/{driveId}/items/{id}/content`.
 - **Exclusão** (`delete`): `DELETE /drives/{driveId}/items/{id}`.
 
-Como a interface é a mesma do mock, **nenhum outro arquivo do sistema precisa mudar** — controllers e o leitor de e-mail continuam funcionando igual.
+Assim que as variáveis `SHAREPOINT_*` forem preenchidas (e `STORAGE_PROVIDER=sharepoint`), o provider passa **sozinho** do mock para o modo real — **nenhuma alteração de código é necessária**. Como a interface é a mesma, controllers e o leitor de e-mail continuam iguais.
 
 ### d) Observação sobre arquivos antigos
 Cada nota guarda em qual provider está (`Invoice.storageProvider`). Arquivos salvos no período de mock permanecem marcados como tal; a migração para SharePoint vale para os novos. Em dev não há dados reais a preservar.
