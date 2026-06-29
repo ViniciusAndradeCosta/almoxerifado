@@ -6,7 +6,7 @@ import { Employee } from "../../types/Employee";
 import { formatDate } from "../../utils/dateFunctions";
 import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS, FUNCOES_POR_SETOR, UNIFORMES_POR_FUNCAO } from "../../constants/uniformesPorSetor";
 import { company } from "./EmployeeTypes";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   IconUsers, IconPlus, IconEdit, IconTrash, IconSearch,
   IconX, IconDownload, IconCheckCircle, IconArrowRight, IconPackage,
@@ -119,6 +119,7 @@ const Funcionarios = () => {
 
   // Abre modal de cadastro ou troca automaticamente via URL
   const location = useLocation();
+  const navigate = useNavigate();
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("novo") === "true" && !panelOpen) {
@@ -127,7 +128,7 @@ const Funcionarios = () => {
     const trocarId = params.get("trocar");
     if (trocarId && funcionarios.length > 0 && !panelOpen) {
       const emp = funcionarios.find((e: Employee) => e.id === Number(trocarId));
-      if (emp) { openTroca(emp); window.history.replaceState({}, "", window.location.pathname); }
+      if (emp) { navigate(`/funcionarios/${emp.id}/trocar-funcao`); }
     }
   }, [location.search, funcionarios]);
 
@@ -659,7 +660,7 @@ const Funcionarios = () => {
                           <Link to={`/saida/${emp.id}`} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", fontSize: "0.7rem", fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
                             <IconArrowRight size={11}/> Saídas
                           </Link>
-                          <button onClick={() => openTroca(emp)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "none", background: "var(--info)", color: "#fff", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          <button onClick={() => navigate(`/funcionarios/${emp.id}/trocar-funcao`)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "none", background: "var(--info)", color: "#fff", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                             <IconRefreshCw size={11}/> Trocar Função
                           </button>
                           <button onClick={() => openEdicao(emp)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 5, border: "none", background: "#2563EB", color: "#fff", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>

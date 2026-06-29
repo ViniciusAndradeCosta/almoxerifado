@@ -22,6 +22,7 @@ import Lavanderia from "./pages/Item/Lavanderia";
 import Hoje from "./pages/Dashboard/Hoje";
 import Devolucao from "./pages/Item/Devolucao";
 import NotasFiscais from "./pages/Item/NotasFiscais";
+import TrocarFuncao from "./pages/Funcionarios/TrocarFuncao";
 
 const AppLayout = () => {
   return (
@@ -54,6 +55,7 @@ const AppRoutes = () => {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/armario" element={<Armario />} />
                 <Route path="/funcionarios" element={<Funcionario />} />
+                <Route path="/funcionarios/:id/trocar-funcao" element={<TrocarFuncao />} />
                 <Route path="/funcionarios/:tipo" element={<Funcionario />} />
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/saidas" element={<TodasSaidas />} />

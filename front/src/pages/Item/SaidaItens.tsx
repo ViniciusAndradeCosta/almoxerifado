@@ -222,7 +222,7 @@ const SaidaItens = () => {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => navigate(`/funcionarios?trocar=${id}`)}
+            onClick={() => navigate(`/funcionarios/${id}/trocar-funcao`)}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--info)", border: "none", borderRadius: 7, color: "#fff", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>
             <IconRefreshCw size={13}/> Trocar Função
           </button>
