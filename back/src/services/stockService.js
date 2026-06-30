@@ -19,7 +19,7 @@ export function validarDataSaida(withdrawalDate) {
   }
 
   const limite = new Date();
-  limite.setDate(hoje.getDate() - LIMITE_DIAS_SAIDA);
+  limite.setDate(limite.getDate() - LIMITE_DIAS_SAIDA);
   limite.setHours(0, 0, 0, 0); // compara apenas por dia
 
   if (data < limite) {
