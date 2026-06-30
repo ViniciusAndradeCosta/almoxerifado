@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../services/useApi";
 import { Item } from "../../types/Item";
 import { formatDate } from "../../utils/dateFunctions";
+import { matchPrefixo } from "../../utils/search";
 import { SearchDropdown } from "../../components/SearchDropdown";
 
 interface LaundryRecord {
@@ -106,7 +107,7 @@ const Lavanderia = () => {
         setItemSearch(value.toUpperCase());
         setSelectedItemId(null);
         setFilteredItems(value.length > 0
-            ? items.filter(item => item.name.toLowerCase().includes(value.toLowerCase()))
+            ? items.filter(item => matchPrefixo(item.name, value))
             : []);
     };
 

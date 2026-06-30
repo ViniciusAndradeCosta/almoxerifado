@@ -4,6 +4,7 @@ import api from "../../services/useApi";
 import Papa from "papaparse";
 import { Employee } from "../../types/Employee";
 import { formatDate } from "../../utils/dateFunctions";
+import { matchPrefixo } from "../../utils/search";
 import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS, FUNCOES_POR_SETOR, UNIFORMES_POR_FUNCAO } from "../../constants/uniformesPorSetor";
 import { company } from "./EmployeeTypes";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -394,7 +395,7 @@ const Funcionarios = () => {
         setDropdownPos({ top: rect.bottom + 2, left: rect.left, width: rect.width });
       }
       setFilteredPrimeiroItem(
-        todosItems.filter(i => i.name.toLowerCase().includes(val.toLowerCase())).slice(0, 6)
+        todosItems.filter(i => matchPrefixo(i.name, val)).slice(0, 6)
       );
       setHighlightedIndex(-1);
     } else {

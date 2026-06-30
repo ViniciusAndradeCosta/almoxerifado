@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/useApi";
 import { formatDate } from "../../utils/dateFunctions";
+import { matchPrefixo } from "../../utils/search";
 import {
   IconSearch, IconX, IconCheckCircle, IconTrash, IconUsers, IconPackage, IconArrowRight
 } from "../../components/Icons";
@@ -94,7 +95,7 @@ const Devolucao = () => {
 
   const handleEmpSearch = (val: string) => {
     setEmpSearch(val); setHighlightedIdx(-1);
-    setFilteredEmps(val.length > 0 ? employees.filter(e => e.name.toLowerCase().includes(val.toLowerCase()) || e.department.toLowerCase().includes(val.toLowerCase())).slice(0, 6) : []);
+    setFilteredEmps(val.length > 0 ? employees.filter(e => matchPrefixo(e.name, val) || matchPrefixo(e.department, val)).slice(0, 6) : []);
   };
 
   const selectEmp = (emp: Employee, manterUrl = false) => {

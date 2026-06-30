@@ -239,7 +239,13 @@ const Armario = () => {
                                 onChange={(val) => {
                                     setNomeOcupante(val);
                                     const v = val.trim().toLowerCase();
-                                    setFuncsFiltrados(v ? funcionarios.filter(f => f.name.toLowerCase().includes(v)).slice(0, 30) : []);
+                                    // Casa pela ORDEM das letras: nome (ou qualquer palavra) que COMECE com o texto.
+                                    setFuncsFiltrados(v
+                                        ? funcionarios.filter(f => {
+                                            const nome = f.name.toLowerCase();
+                                            return nome.startsWith(v) || nome.split(/\s+/).some(p => p.startsWith(v));
+                                        }).slice(0, 30)
+                                        : []);
                                 }}
                                 onSelect={(f) => { setNomeOcupante(f.name); setFuncsFiltrados([]); }}
                                 onClear={() => setFuncsFiltrados([])}

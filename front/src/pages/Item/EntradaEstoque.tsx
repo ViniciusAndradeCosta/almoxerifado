@@ -3,6 +3,7 @@ import api from "../../services/useApi";
 import { StockEntry } from "../../types/StockEntry";
 import { Item } from "../../types/Item";
 import { formatDate } from "../../utils/dateFunctions";
+import { matchPrefixo } from "../../utils/search";
 import { SearchDropdown } from "../../components/SearchDropdown";
 import { IconTrash } from "../../components/Icons";
 
@@ -43,7 +44,7 @@ const EntradaEstoque = () => {
         setItemSearch(value.toUpperCase());
         setSelectedItemId(null);
         setFilteredItems(value.length > 0
-            ? items.filter(i => i.name.toLowerCase().includes(value.toLowerCase()))
+            ? items.filter(i => matchPrefixo(i.name, value))
             : []);
     };
 

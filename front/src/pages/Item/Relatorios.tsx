@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../services/useApi";
 import { Item } from "../../types/Item";
+import { matchPrefixo } from "../../utils/search";
 
 interface ReportData {
     item: {
@@ -81,9 +82,7 @@ const Relatorios = () => {
         setItemSearch(value.toUpperCase());
         setSelectedItemId(null);
         if (value.length > 0) {
-            const filtered = items.filter((item) =>
-                item.name.toLowerCase().includes(value.toLowerCase())
-            );
+            const filtered = items.filter((item) => matchPrefixo(item.name, value));
             setFilteredItems(filtered);
         } else {
             setFilteredItems([]);

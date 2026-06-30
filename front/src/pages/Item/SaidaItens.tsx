@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/useApi";
 import { formatDate, getLocalDateISO } from "../../utils/dateFunctions";
+import { matchPrefixo } from "../../utils/search";
 import { format, subDays } from "date-fns";
 import { Employee } from "../../types/Employee";
 import { Item } from "../../types/Item";
@@ -88,7 +89,7 @@ const SaidaItens = () => {
     setItemSearch(val.toUpperCase());
     setSelectedItem(null);
     setFilteredItems(val.length > 0
-      ? items.filter(i => i.name.toLowerCase().includes(val.toLowerCase()))
+      ? items.filter(i => matchPrefixo(i.name, val))
       : []);
   };
 
