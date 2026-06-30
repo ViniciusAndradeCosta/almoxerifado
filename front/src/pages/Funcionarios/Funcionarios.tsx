@@ -5,6 +5,7 @@ import Papa from "papaparse";
 import { Employee } from "../../types/Employee";
 import { formatDate } from "../../utils/dateFunctions";
 import { matchPrefixo } from "../../utils/search";
+import { melhorItemKit } from "../../utils/matchEstoque";
 import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS, FUNCOES_POR_SETOR, UNIFORMES_POR_FUNCAO } from "../../constants/uniformesPorSetor";
 import { company } from "./EmployeeTypes";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -54,7 +55,7 @@ interface TrocaItem {
 
 const emptyForm = {
   name: "", company: "", role: "", department: "",
-  admissionDate: "", shirt_size: "", pants_size: "", shoes_size: "",
+  admissionDate: "", gender: "", shirt_size: "", pants_size: "", shoes_size: "",
 };
 
 const Funcionarios = () => {
@@ -174,6 +175,7 @@ const Funcionarios = () => {
       role: emp.role || "",
       department: emp.department || "",
       admissionDate: emp.admissionDate ? new Date(emp.admissionDate).toISOString().split("T")[0] : "",
+      gender: emp.gender || "",
       shirt_size: emp.shirt_size || "",
       pants_size: emp.pants_size?.toString() || "",
       shoes_size: emp.shoes_size?.toString() || "",
@@ -367,12 +369,9 @@ const Funcionarios = () => {
     setKitItensForm(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const tam = tamanho.toUpperCase().trim();
-      // Busca exata: nome do item no estoque contém o nome do kit E o tamanho bate
+      // Cruza por palavras do kit + tamanho + gênero (variantes FEMININA/MASCULINA).
       const encontrado = tam
-        ? todosItems.find(est =>
-            est.name.toUpperCase().includes(item.nomeKit.toUpperCase()) &&
-            est.size?.toUpperCase().trim() === tam
-          ) || null
+        ? melhorItemKit(item.nomeKit, todosItems, { tamanho: tam, genero: form.gender })
         : null;
       return { ...item, tamanho, itemVinculado: encontrado };
     }));
@@ -452,6 +451,7 @@ const Funcionarios = () => {
         role: form.role,
         department: form.department,
         admissionDate: date.toISOString(),
+        gender: form.gender || null,
         shirt_size: form.shirt_size.toUpperCase(),
         pants_size: parseInt(form.pants_size) || 0,
         shoes_size: parseInt(form.shoes_size) || 0,
@@ -493,6 +493,7 @@ const Funcionarios = () => {
         role: form.role,
         department: form.department,
         admissionDate: date.toISOString(),
+        gender: form.gender || null,
         shirt_size: form.shirt_size.toUpperCase(),
         pants_size: parseInt(form.pants_size) || 0,
         shoes_size: parseInt(form.shoes_size) || 0,
@@ -833,6 +834,14 @@ const Funcionarios = () => {
                       <span style={{ color: "var(--text-muted)", fontWeight: 500, marginLeft: 4, fontSize: "0.68rem" }}>opcional</span>
                     </div>
                     <div style={{ padding: "14px 16px" }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={lbl}>Gênero <span style={{ color: "var(--text-muted)", fontWeight: 400, textTransform: "lowercase" }}>(p/ uniformes que variam por gênero)</span></label>
+                        <select className="form-select" value={form.gender} onChange={e => setField("gender", e.target.value)}>
+                          <option value="">Não informado</option>
+                          <option value="M">Masculino</option>
+                          <option value="F">Feminino</option>
+                        </select>
+                      </div>
                       <div style={{ ...fieldRow("1fr 1fr 1fr"), marginBottom: 0 }}>
                         <div>
                           <label style={lbl}>Camisa</label>

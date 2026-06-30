@@ -4,6 +4,7 @@ import api from "../../services/useApi";
 import { Employee } from "../../types/Employee";
 import { UNIFORMES_POR_SETOR, SETORES_DISPONIVEIS, FUNCOES_POR_SETOR } from "../../constants/uniformesPorSetor";
 import { IconRefreshCw, IconCheckCircle, IconPackage, IconTrash, IconCornerDownLeft } from "../../components/Icons";
+import { melhorItemKit } from "../../utils/matchEstoque";
 
 interface ItemEstoque {
   id: number; name: string; type: string; sector: string; size: string; quantity: number;
@@ -95,10 +96,10 @@ export default function TrocarFuncao() {
 
   useEffect(() => { if (emp) recalcular(novoDepartamento); /* eslint-disable-next-line */ }, [emp, novoDepartamento]);
 
+  // Cruza o nome genérico do kit com o estoque por palavras + tamanho + gênero.
   const buscarEstoque = (nome: string, tam: string): ItemEstoque | null => {
-    const t = tam.toUpperCase().trim();
-    if (!t) return null;
-    return estoque.find(e => e.name.toUpperCase().includes(nome.toUpperCase()) && e.size?.toUpperCase().trim() === t) || null;
+    if (!tam.trim()) return null;
+    return melhorItemKit(nome, estoque, { tamanho: tam, genero: emp?.gender });
   };
 
   const setDecisao = (nome: string, decisao: Decisao) =>

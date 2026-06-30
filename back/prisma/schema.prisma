@@ -29,6 +29,7 @@ model Employee {
   role          String
   department    String
   admissionDate DateTime
+  gender        String?      // "M" ou "F" — usado para casar variantes do estoque (ex: CALÇA SOCIAL FEMININA)
   shirt_size    String?
   pants_size    Int?
   shoes_size    Int?

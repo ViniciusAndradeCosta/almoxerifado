@@ -3,17 +3,17 @@ import exceljs from 'exceljs';
 import fs from 'fs';
 
 async function createEmployee(req, res) {
-    const { id, name, company, role, department, admissionDate, shirt_size, pants_size, shoes_size } = req.body;
+    const { name, company, role, department, admissionDate, gender, shirt_size, pants_size, shoes_size } = req.body;
 
     try {
         const newEmployee = await prisma.employee.create({
             data: {
-                id,
                 name: name.toUpperCase(),
                 company: company.toUpperCase(),
                 role: role.toUpperCase(),
                 department: department.toUpperCase(),
                 admissionDate,
+                gender: gender ? gender.toUpperCase() : null,
                 shirt_size,
                 pants_size,
                 shoes_size
@@ -61,7 +61,7 @@ async function getEmployees(req, res) {
 
 async function updateEmployee(req, res) {
     const { id } = req.params;
-    const { name, company, role, department, admissionDate, shirt_size, pants_size, shoes_size } = req.body;
+    const { name, company, role, department, admissionDate, gender, shirt_size, pants_size, shoes_size } = req.body;
 
     try {
         const employee = await prisma.employee.update({
@@ -74,7 +74,9 @@ async function updateEmployee(req, res) {
                 role: role.toUpperCase(),
                 department: department.toUpperCase(),
                 admissionDate,
-                shirt_size: shirt_size.toUpperCase(),
+                // Só altera o gênero quando enviado (evita zerar em updates parciais)
+                gender: gender !== undefined ? (gender ? gender.toUpperCase() : null) : undefined,
+                shirt_size: shirt_size ? shirt_size.toUpperCase() : null,
                 pants_size,
                 shoes_size
             }
