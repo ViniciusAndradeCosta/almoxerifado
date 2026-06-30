@@ -82,8 +82,14 @@ const Pedidos = () => {
     const handleItemSearch = (value: string) => {
         setNovoItemName(value.toUpperCase());
         setNovoItemId(null);
-        if (value.length > 0) {
-            setFilteredItems(items.filter(item => item.name.toLowerCase().includes(value.toLowerCase())));
+        const q = value.toLowerCase().trim();
+        if (q.length > 0) {
+            // Casa pela ORDEM das letras digitadas: nome (ou qualquer palavra dele)
+            // que COMECE com o texto. Assim "A" não traz "CAMISA" por ter 'a' no meio.
+            setFilteredItems(items.filter(item => {
+                const nome = item.name.toLowerCase();
+                return nome.startsWith(q) || nome.split(/\s+/).some(palavra => palavra.startsWith(q));
+            }));
         } else {
             setFilteredItems([]);
         }
